@@ -8,7 +8,7 @@ import yaml
 from twicorder.constants import CONFIG_DIR
 
 
-class Task(object):
+class Task:
 
     def __init__(self, name, frequency=15, output=None, **kwargs):
         self._name = name
@@ -59,7 +59,7 @@ class Task(object):
         return False
 
 
-class TaskManager(object):
+class TaskManager:
 
     _tasks = []
 
@@ -71,7 +71,7 @@ class TaskManager(object):
         cls._tasks = []
         tasks_list = os.path.join(CONFIG_DIR, 'tasks.yaml')
         with open(tasks_list, 'r') as stream:
-            raw_tasks = yaml.load(stream)
+            raw_tasks = yaml.full_load(stream)
         for query, tasks in raw_tasks.items():
             for raw_task in tasks or []:
                 task = Task(
@@ -87,12 +87,3 @@ class TaskManager(object):
         if not self._tasks:
             self.load()
         return self._tasks
-
-
-if __name__ == '__main__':
-    import json
-    task_collector = TaskManager()
-    for task in task_collector.tasks:
-        print(task)
-        print(json.dumps(task.kwargs))
-

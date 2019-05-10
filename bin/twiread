@@ -9,10 +9,10 @@ from twicorder.utils import read
 
 def main():
     """
-    A reader for TwiCorder files. Prints them to the command line or optionally
+    A reader for Twicorder files. Prints them to the command line or optionally
     writes them in plain text to a provided file path.
     """
-    parser = argparse.ArgumentParser('TwiReader - A TwiCorder file reader')
+    parser = argparse.ArgumentParser('TwiReader - A Twicorder file reader')
     parser.add_argument(
         '-f', '--file',
         dest='file',

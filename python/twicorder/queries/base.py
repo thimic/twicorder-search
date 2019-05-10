@@ -10,20 +10,21 @@ import time
 import traceback
 import urllib
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from twicorder import mongo
 from twicorder.auth import Auth, TokenAuth
 from twicorder.config import Config
 from twicorder.constants import TW_TIME_FORMAT
-from twicorder.search.exchange import RateLimitCentral
+from twicorder.exchange import RateLimitCentral
 from twicorder.utils import write, AppData, timestamp_to_datetime
 
 
-class BaseQuery(object):
-
-    _name = NotImplemented
-    _endpoint = NotImplemented
+class BaseQuery:
+    """
+    Base Query class.
+    """
+    name = NotImplemented
+    endpoint = NotImplemented
     _max_count = NotImplemented
     _last_return_token = None
     _results_path = None
@@ -52,12 +53,8 @@ class BaseQuery(object):
         return f'Query({repr(self.name)}, kwargs={str(self.kwargs)})'
 
     @property
-    def name(self):
-        return self._name
-
-    @property
-    def endpoint(self):
-        return self._endpoint
+    def config(self):
+        return Config.get()
 
     @property
     def output(self):
@@ -113,7 +110,11 @@ class BaseQuery(object):
 
     @property
     def mongo_collection(self):
-        if not self._mongo_collection or not mongo.is_connected(self._mongo_collection):
+        if not self.config.get('use_mongo', False):
+            return
+        from twicorder import mongo
+        collection = self._mongo_collection
+        if not collection or not mongo.is_connected(collection):
             self._mongo_collection = mongo.create_collection()
         return self._mongo_collection
 
@@ -132,14 +133,13 @@ class BaseQuery(object):
     def save(self):
         if not self._results or not self._output:
             return
-        config = Config.get()
-        save_root = config.get('save_dir')
+        save_root = self.config.get('save_dir')
         save_dir = os.path.join(save_root, self._output or self.uid)
-        postfix = config.get('save_postfix')
+        extension = self.config.get('save_extension')
         marker = self._results[0]
         stamp = datetime.strptime(marker['created_at'], TW_TIME_FORMAT)
         uid = marker['id']
-        filename = f'{stamp:%Y-%m-%d_%H-%M-%S}_{uid}{postfix}'
+        filename = f'{stamp:%Y-%m-%d_%H-%M-%S}_{uid}{extension}'
         file_path = os.path.join(save_dir, filename)
         results_str = '\n'.join(json.dumps(r) for r in self._results)
         write(f'{results_str}\n', file_path)
@@ -162,7 +162,7 @@ class BaseQuery(object):
         else:
             self.log(f'Wrote {len(self.results)} tweets to MongoDB')
 
-    def pickle(self):
+    def bake_ids(self):
         """
         Saves a cache of tweet IDs from query result to disk. In storing the IDs
         between sessions, we make sure we don't save already found tweets.
@@ -173,16 +173,16 @@ class BaseQuery(object):
         """
 
         # Loading picked tweet IDs
-        tweets = dict(AppData().get_query_tweets(self._name)) or {}
+        tweets = dict(AppData().get_query_tweets(self.name)) or {}
 
-        # # Purging tweet IDs older than 14 days
-        # now = datetime.now()
-        # old_tweets = tweets.copy()
-        # tweets = {}
-        # for tweet_id, timestamp in old_tweets.items():
-        #     dt = datetime.fromtimestamp(timestamp)
-        #     if not now - dt > timedelta(days=14):
-        #         tweets[tweet_id] = timestamp
+        # Purging tweet IDs older than 14 days
+        now = datetime.now()
+        old_tweets = tweets.copy()
+        tweets = {}
+        for tweet_id, timestamp in old_tweets.items():
+            dt = datetime.fromtimestamp(timestamp)
+            if not now - dt > timedelta(days=14):
+                tweets[tweet_id] = timestamp
 
         # Stores tweet IDs from result
         self._results = [t for t in self.results if t['id'] not in tweets]
@@ -192,29 +192,19 @@ class BaseQuery(object):
             dt = datetime.strptime(created_at, TW_TIME_FORMAT)
             timestamp = int(dt.timestamp())
             new_tweets.append((result['id'], timestamp))
-        AppData().add_query_tweets(self._name, new_tweets)
-
-
-class TweepyQuery(BaseQuery):
-
-    def __init__(self, api, kwargs):
-        super(TweepyQuery, self).__init__()
-        self._api = api
-        self._kwargs = kwargs
-
-    @property
-    def api(self):
-        return self._api
+        AppData().add_query_tweets(self.name, new_tweets)
 
 
 class RequestQuery(BaseQuery):
-
+    """
+    Queries based on the requests module and the twitter API.
+    """
     _base_url = 'https://api.twitter.com/1.1'
     _request_type = 'get'
     _token_auth = False
 
     _hash_keys = [
-        '_endpoint',
+        'endpoint',
         '_results_path',
         '_fetch_more_path',
         '_orig_kwargs',
@@ -257,7 +247,7 @@ class RequestQuery(BaseQuery):
         self._log = []
 
         # Check rate limit for query. Sleep if limits are in effect.
-        limit = RateLimitCentral().get(self.endpoint)
+        limit = RateLimitCentral.get(self.endpoint)
         self.log(f'URL: {self.request_url}')
         self.log(f'{limit}')
         if limit and limit.remaining == 0:
@@ -278,17 +268,17 @@ class RequestQuery(BaseQuery):
                     response = request(
                         self.request_url,
                         data=json.dumps(self.kwargs),
-                        auth=TokenAuth()
+                        auth=TokenAuth.bearer
                     )
                 else:
-                    request = getattr(Auth().oauth, self.request_type)
+                    request = getattr(Auth(), self.request_type)
                     response = request(self.request_url)
             except Exception:
                 attempts += 1
                 self.log(traceback.format_exc())
                 time.sleep(2**attempts)
                 if attempts >= 5:
-                    break
+                    raise
             else:
                 break
 
@@ -307,7 +297,7 @@ class RequestQuery(BaseQuery):
         self.log('Successful return!')
 
         # Update rate limit for query
-        RateLimitCentral().update(self.endpoint, response.headers)
+        RateLimitCentral.update(self.endpoint, response.headers)
 
         # Search query response for additional paged results. Pronounce the
         # query done if no more pages are found.
@@ -336,7 +326,7 @@ class RequestQuery(BaseQuery):
         # Saves and stores IDs for crawled tweets found in the query result.
         # Also records the last tweet ID found.
         if results:
-            self.pickle()
+            self.bake_ids()
             self.log(f'Cached Tweet IDs to disk!')
             self.save()
             if self.last_id is None:

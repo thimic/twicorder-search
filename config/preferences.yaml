@@ -1,37 +1,17 @@
 
 # Save location, file name and extension for collected data
-save_dir: "~/Desktop/control"
-save_prefix: "control_"
-save_postfix: ".twzip"
-
-# Amount of tweets to store per file
-tweets_per_file: 1000
+save_dir: "~/Twicorder"
+save_extension: ".zip"
 
 # How often this config will be reloaded by the listener (minutes)
 config_reload_interval: 15
 
-# Stream mode ("filter" or "sample")
-stream_mode: sample
-
 # Additionally store tweets in MongoDB
 use_mongo: False
-
-# Languages
-languages:
-  - en
-
-# Keywords to track in tweets
-track:
-
-# User IDs to follow
-follow:
-
-# Automatically track all screen names derived from the follow section
-follow_also_tracks: True
 
 # For every tweet with mentions, look up each mention's full user data
 full_user_mentions: True
 
 # When performing user lookups, cache the user and don't check again for this
 # interval (minutes)
-user_lookup_interval: 30
+user_lookup_interval: 15

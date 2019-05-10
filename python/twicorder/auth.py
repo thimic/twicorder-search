@@ -2,73 +2,58 @@
 # -*- coding: utf-8 -*-
 
 import os
+import requests
 
-from tweepy import OAuthHandler
-from tweepy.auth import AppAuthHandler
-from twicorder.utils import Singleton
+from requests.auth import AuthBase
+from requests_oauthlib import OAuth1Session
 
 
-def get_auth_handler():
+class Auth:
     """
-    Loads login credentials from environment variables and instantiates an
-    authentication handler.
-
-    Returns:
-        tweepy.OAuthHandler: Authentication handler
-
+    Class for accessing the Auth handler
     """
-    app_auth = {
-        'consumer_key': os.getenv('CONSUMER_KEY'),
-        'consumer_secret': os.getenv('CONSUMER_SECRET')
-    }
-    user_auth = {
-        'key': os.getenv('ACCESS_TOKEN'),
-        'secret': os.getenv('ACCESS_SECRET')
-    }
-    auth_handler = OAuthHandler(**app_auth)
-    auth_handler.set_access_token(**user_auth)
-    return auth_handler
-
-
-def get_token_auth():
-    """
-    Loads login credentials from environment variables and instantiates a
-    bearer token.
-
-    Returns:
-        OAuth2Bearer: Bearer token
-
-    """
-    auth = AppAuthHandler(
-        consumer_key=os.getenv('CONSUMER_KEY'),
-        consumer_secret=os.getenv('CONSUMER_SECRET')
+    session = OAuth1Session(
+        os.getenv('CONSUMER_KEY'),
+        client_secret=os.getenv('CONSUMER_SECRET')
     )
-    bearer = auth.apply_auth()
-    return bearer
-
-
-class Auth(object, metaclass=Singleton):
-    """
-    Singleton for accessing the Auth handler
-    """
-
-    _handler = get_auth_handler()
 
     def __new__(cls, *args, **kwargs):
-        return cls._handler
+        return cls.session
 
 
-class TokenAuth(object, metaclass=Singleton):
+class TokenAuth:
     """
-    Singleton for accessing the Bearer Token
+    Class for accessing the Bearer Token
     """
 
-    _handler = get_token_auth()
+    _bearer_token = ''
 
-    def __new__(cls, *args, **kwargs):
-        return cls._handler
+    def __init__(self):
+        resp = requests.post(
+            'https://api.twitter.com/oauth2/token',
+            auth=(os.getenv('CONSUMER_KEY'), os.getenv('CONSUMER_SECRET')),
+            data={'grant_type': 'client_credentials'}
+        )
+        data = resp.json()
+        token_type = data.get('token_type')
+        if token_type != 'bearer':
+            msg = (
+                f'Expected token_type to equal "bearer", but got {token_type} '
+                f'instead.'
+            )
+            raise AttributeError(msg)
+
+        self._bearer_token = data['access_token']
+
+    @property
+    def bearer(self):
+        return OAuth2Bearer(self._bearer_token)
 
 
-if __name__ == '__main__':
-    handler = get_auth_handler()
-    print(handler.oauth)
+class OAuth2Bearer(AuthBase):
+    def __init__(self, bearer_token):
+        self.bearer_token = bearer_token
+
+    def __call__(self, request):
+        request.headers['Authorization'] = 'Bearer ' + self.bearer_token
+        return request

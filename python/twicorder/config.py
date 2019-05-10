@@ -8,7 +8,7 @@ import yaml
 from twicorder.constants import CONFIG_DIR
 
 
-class Config(object):
+class Config:
     """
     Class for reading config file. Re-checking file on disk after a set
     interval to pick up changes.
@@ -29,7 +29,7 @@ class Config(object):
         """
         listener_path = os.path.join(CONFIG_DIR, 'preferences.yaml')
         with open(listener_path, 'r') as stream:
-            config = yaml.load(stream)
+            config = yaml.full_load(stream)
         return config
 
     @classmethod

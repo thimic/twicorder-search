@@ -15,7 +15,7 @@ from twicorder.constants import (
 )
 
 
-class FileLogger(object):
+class FileLogger:
 
     @staticmethod
     def get():
@@ -40,20 +40,6 @@ class FileLogger(object):
         return logger
 
 
-class Singleton(type):
-    """
-    Class that can only be instanciated once.
-    """
-
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            instance = super(Singleton, cls).__call__(*args, **kwargs)
-            cls._instances[cls] = instance
-        return cls._instances[cls]
-
-
 def auto_commit(func):
     def func_wrapper(self, *args, **kwargs):
         with self._conn:
@@ -61,7 +47,7 @@ def auto_commit(func):
     return func_wrapper
 
 
-class AppData(object):
+class AppData:
     """
     Class for reading and writing AppData to be used between sessions.
     """

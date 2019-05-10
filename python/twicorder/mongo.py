@@ -47,7 +47,7 @@ def is_connected(entity):
     return True
 
 
-def create_collection(db_name='slpng_giants', collection_name='tweets'):
+def create_collection(db_name='twicorder', collection_name='tweets'):
     """
     Create collection for the given database. Skip an return early if collection
     exists.
@@ -93,7 +93,7 @@ def create_collection(db_name='slpng_giants', collection_name='tweets'):
         return
 
 
-def backfill(path=None, db_name='slpng_giants', collection_name='tweets'):
+def backfill(path=None, db_name='twicorder', collection_name='tweets'):
     logger = utils.FileLogger.get()
     tweets = create_collection(db_name, collection_name)
 

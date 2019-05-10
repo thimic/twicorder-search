@@ -7,17 +7,27 @@ from datetime import datetime
 from queue import Queue
 from threading import Thread
 
-from twicorder.utils import Singleton, FileLogger
+from twicorder.utils import FileLogger
 
 logger = FileLogger.get()
 
 
-class RateLimitCentral(object, metaclass=Singleton):
+class RateLimitCentral:
+    """
+    Class keeping track of end points and their rate limits.
+    """
+    _limits = {}
 
-    def __init__(self):
-        self._limits = {}
+    @classmethod
+    def update(cls, endpoint, header):
+        """
+        Update endpoint with latest rate limit information.
 
-    def update(self, endpoint, header):
+        Args:
+            endpoint (str): Endpoint
+            header (dict): Query response header
+
+        """
         limit_keys = {
             'x-rate-limit-limit',
             'x-rate-limit-remaining',
@@ -25,35 +35,77 @@ class RateLimitCentral(object, metaclass=Singleton):
         }
         if not limit_keys.issubset(header.keys()):
             return
-        self._limits[endpoint] = RateLimit(header)
+        cls._limits[endpoint] = RateLimit(header)
 
-    def get(self, endpoint):
-        return self._limits.get(endpoint)
+    @classmethod
+    def get(cls, endpoint):
+        """
+        Retrieves latest rate limit information for the given endpoint.
+        Args:
+            endpoint (str): Endpoint
 
-    def get_cap(self, endpoint):
-        limit = self.get(endpoint)
+        Returns:
+            RateLimit: Rate limit object
+
+        """
+        return cls._limits.get(endpoint)
+
+    @classmethod
+    def get_cap(cls, endpoint):
+        """
+        Retrieve the query cap for the given endpoint.
+
+        Args:
+            endpoint (str): Endpoint
+
+        Returns:
+            int: Max queries per 15 minutes
+
+        """
+        limit = cls.get(endpoint)
         if not limit:
             return
         return limit.cap
 
-    def get_remaining(self, endpoint):
-        limit = self.get(endpoint)
+    @classmethod
+    def get_remaining(cls, endpoint):
+        """
+        Retrieve number of remaining queries for the given endpoint.
+
+        Args:
+            endpoint (str): Endpoint
+
+        Returns:
+            int: Remaining queries for the current 15 minute window
+
+        """
+        limit = cls.get(endpoint)
         if not limit:
             return
         return limit.remaining
 
-    def get_reset(self, endpoint):
-        limit = self.get(endpoint)
+    @classmethod
+    def get_reset(cls, endpoint):
+        """
+        Retrieve time until the current 15 minute window expires.
+
+        Args:
+            endpoint (str): Endpoint
+
+        Returns:
+            float: Time in seconds
+
+        """
+        limit = cls.get(endpoint)
         if not limit:
             return
         return limit.reset
 
 
-class RateLimit(object):
+class RateLimit:
     """
     Rate limit object, used to describe the limits for a given API end point.
     """
-
     def __init__(self, headers):
         self._cap = headers.get('x-rate-limit-limit')
         self._remaining = int(headers.get('x-rate-limit-remaining'))
@@ -143,7 +195,7 @@ class QueryWorker(Thread):
             self.queue.task_done()
 
 
-class QueryExchange(object):
+class QueryExchange:
     """
     Organises queries in queues and executes them after the FIFO princible.
     """
@@ -206,26 +258,5 @@ class QueryExchange(object):
         """
         for queue in self.queues.values():
             queue.put(None)
-        # for queue in self.queues.values():
-        #     queue.join()
         for thread in self.threads.values():
             thread.join()
-
-
-if __name__ == '__main__':
-    from twicorder.auth import get_auth_handler
-    from twicorder.search.queries.request_queries import TimelineQuery
-    auth = get_auth_handler()
-    accounts = [
-        'slpng_giants',
-        'slpng_giants_no',
-        'slpng_giants_se',
-        'slpng_giants_eu',
-        'slpng_giants_nz'
-    ]
-    queries = TimelineQuery(auth)
-
-    qe = QueryExchange()
-    for account in accounts:
-        qe.add(TimelineQuery(auth, screen_name=account))
-    qe.wait()

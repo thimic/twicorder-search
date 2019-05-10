@@ -13,10 +13,6 @@ REGULAR_EXTENSIONS = ['txt', 'json', 'yaml', 'twc']
 COMPRESSED_EXTENSIONS = ['gzip', 'zip', 'twzip']
 
 COMPANY = 'Zhenyael'
-APP = 'TwiCorder'
+APP = 'Twicorder'
 
 APP_DATA_TOKEN = 'twicorder'
-
-
-if __name__ == '__main__':
-    print(CONFIG_DIR)
