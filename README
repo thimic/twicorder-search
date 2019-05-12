@@ -7,6 +7,18 @@ A Twitter crawler for Python 3 based on Twitter’s public API
 pip install twicorder-search
 ```
 
+## Running Twicorder Search
+After installing, there will be a new executable available, `twicorder`. Use this to run the application:
+```bash
+twicorder
+```
+
+To specify a project directory, other than the default, use the flag `--project-dir`:
+
+```bash
+twicorder --project-dir /path/to/my_project
+```
+
 ## Config
 
 ### API credentials
