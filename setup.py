@@ -26,13 +26,9 @@ setup(
         'requests_oauthlib',
     ],
     classifiers=[
-        'Development Status :: 4 - Beta',
-        'Intended Audience :: Researchers',
-        'Topic :: Research :: Twitter',
-        'License :: OSI Approved :: MIT License',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
     ],
 )
 
