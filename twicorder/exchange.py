@@ -7,9 +7,9 @@ from datetime import datetime
 from queue import Queue
 from threading import Thread
 
-from twicorder.utils import FileLogger
+from twicorder.utils import TwiLogger
 
-logger = FileLogger.get()
+logger = TwiLogger()
 
 
 class RateLimitCentral:
@@ -186,8 +186,7 @@ class QueryWorker(Thread):
                 try:
                     self.query.run()
                 except Exception:
-                    import traceback
-                    logger.exception(traceback.format_exc())
+                    logger.exception('Query failed:\n')
                     break
                 logger.info(self.query.fetch_log())
                 time.sleep(.2)
@@ -197,21 +196,15 @@ class QueryWorker(Thread):
 
 class QueryExchange:
     """
-    Organises queries in queues and executes them after the FIFO princible.
+    Organises queries in queues and executes them after the FIFO principle.
     """
-    def __init__(self):
-        self._queues = {}
-        self._threads = {}
 
-    @property
-    def queues(self):
-        return self._queues
+    queues = {}
+    threads = {}
+    failure = False
 
-    @property
-    def threads(self):
-        return self._threads
-
-    def get_queue(self, endpoint):
+    @classmethod
+    def get_queue(cls, endpoint):
         """
         Retrieves the queue for the given endpoint if it exists, otherwise
         creates a queue.
@@ -223,16 +216,17 @@ class QueryExchange:
             Queue: Queue for endpoint
 
         """
-        if not self._queues.get(endpoint):
+        if not cls.queues.get(endpoint):
             queue = Queue()
-            self._queues[endpoint] = queue
+            cls.queues[endpoint] = queue
             thread = QueryWorker(name=endpoint)
             thread.setup(queue=queue)
             thread.start()
-            self._threads[endpoint] = thread
-        return self._queues[endpoint]
+            cls.threads[endpoint] = thread
+        return cls.queues[endpoint]
 
-    def add(self, query):
+    @classmethod
+    def add(cls, query):
         """
         Finds appropriate queue for given end point and adds it.
 
@@ -240,23 +234,32 @@ class QueryExchange:
             query (BaseQuery): Query object
 
         """
-        queue = self.get_queue(query.endpoint)
+        queue = cls.get_queue(query.endpoint)
         if query in queue.queue:
             logger.info(f'Query with ID {query.uid} is already in the queue.')
             return
-        thread = self.threads.get(query.endpoint)
+        thread = cls.threads.get(query.endpoint)
         if thread and thread.query == query:
             logger.info(f'Query with ID {query.uid} is already running.')
             return
         queue.put(query)
-        logger.info(query)
 
-    def wait(self):
+    @classmethod
+    def clear(cls):
+        """
+        Prepares QueryExchange for a new run.
+        """
+        cls.queues = {}
+        cls.threads = {}
+        cls.failure = False
+
+    @classmethod
+    def wait(cls):
         """
         Sends shutdown signal to threads and waits for all threads and queues to
         terminate.
         """
-        for queue in self.queues.values():
-            queue.put(None)
-        for thread in self.threads.values():
+        for queue in cls.queues.values():
+            queue.put_nowait(None)
+        for thread in cls.threads.values():
             thread.join()

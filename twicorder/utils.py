@@ -8,36 +8,45 @@ import sys
 
 from datetime import datetime
 from gzip import GzipFile
-from logging import FileHandler, StreamHandler
+from logging import StreamHandler
+
+from logging.handlers import RotatingFileHandler
 
 from twicorder.constants import (
-    REGULAR_EXTENSIONS, COMPRESSED_EXTENSIONS, USER_DIR, TW_TIME_FORMAT
+    REGULAR_EXTENSIONS, COMPRESSED_EXTENSIONS, TW_TIME_FORMAT
 )
+from twicorder.project_manager import ProjectManager
 
 
-class FileLogger:
+class TwiLogger:
 
-    @staticmethod
-    def get():
-        log_path = os.path.join(USER_DIR, 'logs', 'twicorder.log')
-        if not os.path.exists(os.path.dirname(log_path)):
-            os.makedirs(os.path.dirname(log_path))
-        logger = logging.getLogger('TwiCorder')
-        file_handler = FileHandler(log_path)
+    _logger = None
+
+    @classmethod
+    def setup(cls):
+        cls._logger = logging.getLogger('Twicorder')
+        file_handler = RotatingFileHandler(
+            ProjectManager.logs,
+            maxBytes=1024**2 * 10,
+            backupCount=5
+        )
         formatter = logging.Formatter(
             '%(asctime)s: [%(levelname)s] %(message)s'
         )
         file_handler.setFormatter(formatter)
         file_handler.setLevel(logging.WARNING)
-        logger.addHandler(file_handler)
+        cls._logger.addHandler(file_handler)
 
         stream_handler = StreamHandler(sys.stdout)
         stream_handler.setLevel(logging.DEBUG)
-        logger.addHandler(stream_handler)
+        cls._logger.addHandler(stream_handler)
 
-        logger.setLevel(logging.DEBUG)
+        cls._logger.setLevel(logging.DEBUG)
 
-        return logger
+    def __new__(cls, *args, **kwargs):
+        if not cls._logger:
+            cls.setup()
+        return cls._logger
 
 
 def auto_commit(func):
@@ -52,14 +61,9 @@ class AppData:
     Class for reading and writing AppData to be used between sessions.
     """
 
-    _data_path = os.path.join(USER_DIR, 'AppData')
-
     def __init__(self):
-        if not os.path.exists(self._data_path):
-            os.makedirs(self._data_path)
-        filepath = os.path.join(self._data_path, 'twicorder.sql')
         self._conn = sqlite3.connect(
-            filepath,
+            ProjectManager.app_data,
             isolation_level=None,
             check_same_thread=True
         )

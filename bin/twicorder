@@ -1,5 +1,30 @@
-#!/usr/bin/env bash
+#!/usr/bin/env python3.7
+# -*- coding: utf-8 -*-
 
-THIS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
-PARENT_DIR="$( dirname "${THIS_DIR}" )"
-PYTHONPATH=${PARENT_DIR}/python python3 ${PARENT_DIR}/python/twicorder/controller.py
+import click
+import sys
+import traceback
+
+
+@click.command('Twicorder Search')
+@click.option(
+    '--project-dir',
+    type=str,
+    default=None,
+    help='Path to project dir. Default is ~/Twicorder.'
+)
+def main(project_dir):
+    """
+    Twicorder Search
+    """
+    from twicorder.controller import Twicorder
+
+    twicorder = Twicorder(project_dir=project_dir)
+    try:
+        twicorder.run()
+    except Exception:
+        click.echo(traceback.format_exc())
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()

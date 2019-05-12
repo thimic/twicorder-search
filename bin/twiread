@@ -1,38 +1,47 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import argparse
+import click
 import os
 
 from twicorder.utils import read
 
 
-def main():
+@click.command('Twicorder Reader')
+@click.option(
+    '-i',
+    '--input',
+    'inputs',
+    default=None,
+    multiple=True,
+    type=str,
+    help='Input file(s) to read. Specify multiple with "-i file1, -i file2" etc'
+)
+@click.option(
+    '-o',
+    '--output',
+    default=None,
+    type=str,
+    help='Output file. Used for converting compressed files to plain text.'
+)
+def main(inputs, output):
     """
     A reader for Twicorder files. Prints them to the command line or optionally
     writes them in plain text to a provided file path.
     """
-    parser = argparse.ArgumentParser('TwiReader - A Twicorder file reader')
-    parser.add_argument(
-        '-f', '--file',
-        dest='file',
-        type=str,
-        required=True,
-        help='File to read'
-    )
-    parser.add_argument(
-        '-o', '--output',
-        dest='output',
-        type=str,
-        help='Destination for file'
-    )
-    args = parser.parse_args()
-    data = read(args.file)
-    if args.output:
-        with open(os.path.expanduser(args.output), 'w') as stream:
-            stream.write(data)
-        return
-    print(data)
+    output_real_path = None
+    if output:
+        output_real_path = os.path.expanduser(output)
+        os.makedirs(os.path.dirname(output_real_path), exist_ok=True)
+    for input_path in inputs:
+        lines = read(input_path)
+        if output_real_path:
+            with open(output_real_path, 'a') as output_file:
+                output_file.writelines(lines)
+            continue
+        title = f' {input_path} '.center(80, '=')
+        click.echo(f'\n{title}\n')
+        click.echo(lines)
 
 
 if __name__ == '__main__':

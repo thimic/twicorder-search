@@ -1,6 +1,12 @@
 
+# API Login credentials
+consumer_key:
+consumer_secret:
+access_token:
+access_secret:
+
 # Save location, file name and extension for collected data
-save_dir: "~/Twicorder"
+save_dir:
 save_extension: ".zip"
 
 # How often this config will be reloaded by the listener (minutes)

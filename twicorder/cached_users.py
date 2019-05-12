@@ -6,6 +6,7 @@ from threading import Lock
 
 from twicorder.utils import collect_key_values
 from twicorder.config import Config
+from twicorder.constants import DEFAULT_EXPAND_USERS_INTERVAL
 from twicorder.queries import RequestQuery
 
 
@@ -110,8 +111,12 @@ class CachedUserCentral:
     """
 
     users = {}
+    _config = Config.get()
     _cache_life = timedelta(
-        minutes=Config.get().get('user_lookup_interval', 15)
+        minutes=_config.get(
+            'user_lookup_interval',
+            DEFAULT_EXPAND_USERS_INTERVAL
+        )
     )
     lock = Lock()
 

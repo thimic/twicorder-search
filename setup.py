@@ -6,19 +6,22 @@ from distutils.core import setup
 
 setup(
     name='twicorder-search',
-    packages=['twicorder-search'],
-    version='0.2.0',
+    packages=['twicorder', 'twicorder/queries'],
+    scripts=['bin/twicorder', 'bin/twiread'],
+    version='0.2.1',
     license='MIT',
     description='A Twitter crawler for Python 3 based on Twitter\'s public API',
     author='Michael Thingnes',
     author_email='thimic@gmail.com',
     url='https://github.com/thimic/twicorder-search',
-    download_url='https://github.com/thimic/twicorder-search/archive/v_01.tar.gz',
+    download_url='https://github.com/thimic/twicorder-search/archive/v0.2.0.tar.gz',
     keywords=['TWITTER', 'CRAWLER', 'RESEARCH'],
     install_requires=[
+        'click',
         'pymongo',
         'pyyaml',
         'requests',
+        'requests_oauthlib',
     ],
     classifiers=[
         'Development Status :: 4 - Beta',

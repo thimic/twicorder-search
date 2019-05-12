@@ -5,7 +5,11 @@ import os
 import time
 import yaml
 
-from twicorder.constants import CONFIG_DIR
+from twicorder import NoTasksException
+from twicorder.project_manager import ProjectManager
+from twicorder.utils import TwiLogger
+
+logger = TwiLogger()
 
 
 class Task:
@@ -69,8 +73,9 @@ class TaskManager:
         Reading tasks from yaml file and parsing to a dictionary.
         """
         cls._tasks = []
-        tasks_list = os.path.join(CONFIG_DIR, 'tasks.yaml')
-        with open(tasks_list, 'r') as stream:
+        if not os.path.isfile(ProjectManager.tasks):
+            raise NoTasksException
+        with open(ProjectManager.tasks, 'r') as stream:
             raw_tasks = yaml.full_load(stream)
         for query, tasks in raw_tasks.items():
             for raw_task in tasks or []:

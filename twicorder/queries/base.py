@@ -9,13 +9,19 @@ import requests
 import time
 import traceback
 import urllib
+import yaml
 
 from datetime import datetime, timedelta
 
-from twicorder.auth import Auth, TokenAuth
+from twicorder.auth import Auth
 from twicorder.config import Config
-from twicorder.constants import TW_TIME_FORMAT
+from twicorder.constants import (
+    DEFAULT_MONGO_OUTPUT,
+    DEFAULT_OUTPUT_EXTENSION,
+    TW_TIME_FORMAT
+)
 from twicorder.exchange import RateLimitCentral
+from twicorder.project_manager import ProjectManager
 from twicorder.utils import write, AppData, timestamp_to_datetime
 
 
@@ -50,7 +56,11 @@ class BaseQuery:
         return type(self) == type(other) and self.__dict__ == other.__dict__
 
     def __repr__(self):
-        return f'Query({repr(self.name)}, kwargs={str(self.kwargs)})'
+        r = f'<Query({self.name!r}, kwargs={self.kwargs!r}) at 0x{id(self):x}>'
+        return r
+
+    def __str__(self):
+        return f'{self.endpoint}\n{"-" * 80}\n{yaml.dump(self.kwargs)}'
 
     @property
     def config(self):
@@ -110,7 +120,7 @@ class BaseQuery:
 
     @property
     def mongo_collection(self):
-        if not self.config.get('use_mongo', False):
+        if not self.config.get('use_mongo', DEFAULT_MONGO_OUTPUT):
             return
         from twicorder import mongo
         collection = self._mongo_collection
@@ -133,9 +143,11 @@ class BaseQuery:
     def save(self):
         if not self._results or not self._output:
             return
-        save_root = self.config.get('save_dir')
+        save_root = ProjectManager.output_dir or self.config.get('save_dir')
         save_dir = os.path.join(save_root, self._output or self.uid)
-        extension = self.config.get('save_extension')
+        extension = (
+            self.config.get('save_extension') or DEFAULT_OUTPUT_EXTENSION
+        )
         marker = self._results[0]
         stamp = datetime.strptime(marker['created_at'], TW_TIME_FORMAT)
         uid = marker['id']
@@ -268,10 +280,10 @@ class RequestQuery(BaseQuery):
                     response = request(
                         self.request_url,
                         data=json.dumps(self.kwargs),
-                        auth=TokenAuth.bearer
+                        auth=Auth.token()
                     )
                 else:
-                    request = getattr(Auth(), self.request_type)
+                    request = getattr(Auth.session(), self.request_type)
                     response = request(self.request_url)
             except Exception:
                 attempts += 1

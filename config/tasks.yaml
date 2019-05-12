@@ -1,4 +1,23 @@
 
+# Tasks
+#
+# Queries are added on the form listed below.
+#
+# free_search:                  # endpoint name
+#   - frequency: 60             # Interval between repeating queries in minutes
+#     output: github/mentions   # Output directory, relative to project directory
+#     kwargs:                   # Keyword Arguments to feed to endpoint
+#       q: @github              #   "q" for "query" in the case of free_search
+#
+# See https://developer.twitter.com/en/docs/tweets/search/guides/standard-operators
+# for how to use free search to find mentions, replies, hashtags etc.
+#
+# See https://developer.twitter.com/en/docs/tweets/search/api-reference/get-search-tweets
+# for keyword arguments to use with search.
+#
+# See https://developer.twitter.com/en/docs/tweets/timelines/api-reference/get-statuses-user_timeline
+# for keyword arguments to use with user timelines.
+
 user_timeline:
   - frequency: 60
     output: "github/timeline"

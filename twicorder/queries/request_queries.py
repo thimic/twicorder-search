@@ -3,8 +3,9 @@
 
 import urllib
 
-from twicorder.queries import RequestQuery
 from twicorder.cached_users import CachedUserCentral
+from twicorder.constants import DEFAULT_EXPAND_USERS
+from twicorder.queries import RequestQuery
 
 
 class StatusQuery(RequestQuery):
@@ -63,7 +64,7 @@ class TimelineQuery(RequestQuery):
             self.done = True
 
     def save(self):
-        if self.config.get('full_user_mentions', False):
+        if self.config.get('full_user_mentions', DEFAULT_EXPAND_USERS):
             self.log('Expanding user mentions!')
             CachedUserCentral.expand_user_mentions(self.results)
         super(TimelineQuery, self).save()
@@ -100,7 +101,7 @@ class StandardSearchQuery(RequestQuery):
         return url
 
     def save(self):
-        if self.config.get('full_user_mentions', False):
+        if self.config.get('full_user_mentions', DEFAULT_EXPAND_USERS):
             self.log('Expanding user mentions!')
             CachedUserCentral.expand_user_mentions(self.results)
         super(StandardSearchQuery, self).save()

@@ -2,35 +2,31 @@
 # -*- coding: utf-8 -*-
 
 import inspect
+import sys
 import time
 
 from threading import Thread
 
-from twicorder.exchange import QueryExchange
-from twicorder.tasks import TaskManager
-from twicorder.queries import RequestQuery
-from twicorder.queries import request_queries
+from twicorder import TwicorderException
+from twicorder.project_manager import ProjectManager
 
 
 class WorkerThread(Thread):
     """
     Background thread, running queries.
     """
-    def setup(self, func, tasks, query_exchange):
+    def setup(self, func, tasks):
         """
         Preparing thread.
 
         Args:
             func (func): Function to perform
             tasks (list[twicorder.tasks.Task]): Tasks to perform
-            query_exchange (twicorder.exchange.QueryExchange): Query exchange
-                instance
 
         """
         self._running = False
         self._func = func
         self._tasks = tasks
-        self._query_exchange = query_exchange
 
     def stop(self):
         """
@@ -42,12 +38,18 @@ class WorkerThread(Thread):
         """
         Start thread.
         """
+        from twicorder.exchange import QueryExchange
         self._running = True
+        logger.info(' Loading tasks '.center(80, '='))
+        logger.info('')
         while self._running:
             for task in self._tasks:
                 if not task.due:
                     continue
-                self._query_exchange.add(self._func(task))
+                query = self._func(task)
+                QueryExchange.add(query)
+                logger.info(query)
+            logger.info('=' * 80)
             # Sleep 1 minute, then wake up and check if any queries are due to
             # run.
             time.sleep(60)
@@ -57,13 +59,39 @@ class Twicorder:
     """
     Twicorder controller class.
     """
-    def __init__(self):
+    def __init__(self, project_dir=None):
         """
         Constructor for Twicorder class. Sets up the task manager, query
         exchange, worker thread and query types.
+
+        Keyword Args:
+            project_dir (str): Path to Twicorder project directory
+
         """
+        if project_dir:
+            ProjectManager.project_dir = project_dir
+
+        # Todo: Only import logger after project dir is set, to ensure logging
+        #       to project dir. This is ugly and needs a better solution.
+        from twicorder.utils import TwiLogger
+        global logger
+        logger = TwiLogger()
+
+        # Test setup before continuing
+        try:
+            from twicorder.config import Config
+            from twicorder.tasks import TaskManager
+            from twicorder.auth import Auth
+            Config.get()
+            TaskManager.load()
+            Auth.session()
+        except TwicorderException as error:
+            logger.critical(error)
+            sys.exit(1)
+            return
+
+        from twicorder.tasks import TaskManager
         self._task_manager = TaskManager()
-        self._query_exchange = QueryExchange()
         self._worker_thread = WorkerThread()
         self._query_types = {}
 
@@ -90,17 +118,6 @@ class Twicorder:
         return self._task_manager.tasks
 
     @property
-    def query_exchange(self):
-        """
-        Query exchange instance for Twicorder.
-
-        Returns:
-            twicorder.exchange.QueryExchange: Query Exchange
-
-        """
-        return self._query_exchange
-
-    @property
     def query_types(self):
         """
         Compiles a dictionary of available query types by inspecting the
@@ -112,6 +129,8 @@ class Twicorder:
         """
         if self._query_types:
             return self._query_types
+        from twicorder.queries import RequestQuery
+        from twicorder.queries import request_queries
         for name, item in inspect.getmembers(request_queries, inspect.isclass):
             if item == RequestQuery:
                 continue
@@ -132,7 +151,6 @@ class Twicorder:
         self._worker_thread.setup(
             func=self.cast_query,
             tasks=self.tasks,
-            query_exchange=self.query_exchange
         )
         self._worker_thread.start()
 
@@ -154,5 +172,5 @@ class Twicorder:
 
 
 if __name__ == '__main__':
-    twicorder = Twicorder()
+    twicorder = Twicorder('~/Desktop/Twicorder')
     twicorder.run()
