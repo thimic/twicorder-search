@@ -43,13 +43,16 @@ class WorkerThread(Thread):
         logger.info(' Loading tasks '.center(80, '='))
         logger.info('')
         while self._running:
+            update = False
             for task in self._tasks:
                 if not task.due:
                     continue
+                update = True
                 query = self._func(task)
                 QueryExchange.add(query)
                 logger.info(query)
-            logger.info('=' * 80)
+            if update:
+                logger.info('=' * 80)
             # Sleep 1 minute, then wake up and check if any queries are due to
             # run.
             time.sleep(60)

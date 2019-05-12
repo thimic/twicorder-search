@@ -14,7 +14,9 @@ setup(
     author='Michael Thingnes',
     author_email='thimic@gmail.com',
     url='https://github.com/thimic/twicorder-search',
-    download_url='https://github.com/thimic/twicorder-search/archive/v0.2.0.tar.gz',
+    download_url=(
+        'https://github.com/thimic/twicorder-search/archive/v0.2.1.tar.gz'
+    ),
     keywords=['TWITTER', 'CRAWLER', 'RESEARCH'],
     install_requires=[
         'click',
