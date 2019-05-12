@@ -1,14 +1,16 @@
 # Twicorder Search
-A Twitter crawler for Python 3 based on Twitter's public API
+A Twitter crawler for Python 3 based on Twitter’s public API
 
 ## Installation
+
 ```bash
 pip install twicorder-search
 ```
 
 ## Config
-### Environment variables
-Twicorder relies on environment variables for Twitter API authentication. Before starting the application, make sure you have set the following environment variables:
+
+### API credentials
+Twicorder has two ways of setting API credentials. They can either be set in the config file as seen below, or set as environment variables:
 
 ```
 CONSUMER_KEY
@@ -16,10 +18,19 @@ CONSUMER_SECRET
 ACCESS_TOKEN
 ACCESS_SECRET
 ```
+
 ### preferences.yaml
+
 ```yaml
+
+# API Login credentials
+consumer_key:
+consumer_secret:
+access_token:
+access_secret:
+
 # Save location, file name and extension for collected data
-save_dir: "~/Twicorder"
+save_dir:
 save_extension: ".zip"
 
 # How often this config will be reloaded by the listener (minutes)
@@ -35,10 +46,34 @@ full_user_mentions: True
 # interval (minutes)
 user_lookup_interval: 15
 
+
 ```
+
 Use this file to configure how the application runs. Set the output directory, file format, whether to expand user data for mentions etc
+
 ### tasks.yaml
+
 ```yaml
+
+# Tasks
+#
+# Queries are added on the form listed below.
+#
+# free_search:                  # endpoint name
+#   - frequency: 60             # Interval between repeating queries in minutes
+#     output: github/mentions   # Output directory, relative to project directory
+#     kwargs:                   # Keyword Arguments to feed to endpoint
+#       q: @github              #   "q" for "query" in the case of free_search
+#
+# See https://developer.twitter.com/en/docs/tweets/search/guides/standard-operators
+# for how to use free search to find mentions, replies, hashtags etc.
+#
+# See https://developer.twitter.com/en/docs/tweets/search/api-reference/get-search-tweets
+# for keyword arguments to use with search.
+#
+# See https://developer.twitter.com/en/docs/tweets/timelines/api-reference/get-statuses-user_timeline
+# for keyword arguments to use with user timelines.
+
 user_timeline:
   - frequency: 60
     output: "github/timeline"
@@ -58,7 +93,7 @@ free_search:
     output: "github/hashtags"
     kwargs:
       q: "#github"
+
 ```
 
 Use this file to define the queries you wish to run and where to store their output data, relative to the output directory. Frequency is given in minutes and defines how often a new scan will be triggered for the given query.
-
