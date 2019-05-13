@@ -102,6 +102,10 @@ user_timeline:
     output: "github/timeline"
     kwargs:
       screen_name: "github"
+  - frequency: 120
+    output: "nasa/timeline"
+    kwargs:
+      screen_name: "NASA"
 
 free_search:
   - frequency: 60
