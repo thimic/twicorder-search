@@ -8,7 +8,7 @@ Twicorder Search can be installed using PIP:
 pip install twicorder-search
 ```
 
-For a more comprehensive guide using a virtual environment, see [Installation using Python 3 virtual environments](../blob/master/INSTALL.md)
+For a more comprehensive guide using a virtual environment, see [Installation using Python 3 virtual environments](../master/INSTALL.md)
 
 ## Running Twicorder Search
 After installing, there will be a new executable available, `twicorder`. Use this to run the application:
