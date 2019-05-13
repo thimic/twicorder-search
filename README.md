@@ -2,10 +2,13 @@
 A Twitter crawler for Python 3 based on Twitter’s public API
 
 ## Installation
+Twicorder Search can be installed using PIP:
 
 ```bash
 pip install twicorder-search
 ```
+
+For a more comprehensive guide using a virtual environment, see [Installation using Python 3 virtual environments](../blob/master/INSTALL.md)
 
 ## Running Twicorder Search
 After installing, there will be a new executable available, `twicorder`. Use this to run the application:
@@ -20,6 +23,14 @@ twicorder --project-dir /path/to/my_project
 ```
 
 ## Config
+Twicorder Search requires two config files to be set up before it will run - `preferences.yaml` and `tasks.yaml`. Both files must be created and installed to the project directory. Correct layout of the project directory is:
+
+```bash
+PROJECT_ROOT
+└── config
+    ├── preferences.yaml
+    └── tasks.yaml
+```
 
 ### API credentials
 Twicorder has two ways of setting API credentials. They can either be set in the config file as seen below, or set as environment variables:
@@ -90,7 +101,7 @@ user_timeline:
   - frequency: 60
     output: "github/timeline"
     kwargs:
-      screen_name: github
+      screen_name: "github"
 
 free_search:
   - frequency: 60
