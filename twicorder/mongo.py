@@ -99,10 +99,7 @@ def backfill(path=None, db_name='twicorder', collection_name='tweets'):
     logger = TwiLogger()
     tweets = create_collection(db_name, collection_name)
 
-    config = Config.get()
-    save_dir = os.path.expanduser(
-        path or ProjectManager.output_dir or config['save_dir']
-    )
+    save_dir = os.path.expanduser(path or ProjectManager.output_dir)
 
     paths = glob.glob(os.path.join(save_dir, '**', '*.t*'), recursive=True)
     t0 = datetime.now()

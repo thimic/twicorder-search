@@ -30,7 +30,11 @@ class _ProjectManager:
 
     @property
     def output_dir(self):
-        output_path = os.path.join(self.project_dir, 'tweets')
+        from twicorder.config import Config
+        config = Config.get()
+        output_path = config.get('save_dir')
+        if not output_path:
+            output_path = os.path.join(self.project_dir, 'tweets')
         os.makedirs(output_path, exist_ok=True)
         return output_path
 

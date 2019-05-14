@@ -143,8 +143,10 @@ class BaseQuery:
     def save(self):
         if not self._results or not self._output:
             return
-        save_root = ProjectManager.output_dir or self.config.get('save_dir')
-        save_dir = os.path.join(save_root, self._output or self.uid)
+        save_dir = os.path.join(
+            ProjectManager.output_dir,
+            self._output or self.uid
+        )
         extension = (
             self.config.get('save_extension') or DEFAULT_OUTPUT_EXTENSION
         )
