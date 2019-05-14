@@ -1,5 +1,7 @@
 # Twicorder Search
-A Twitter crawler for Python 3 based on Twitter’s public API
+A Twitter crawler for Python 3 based on Twitter’s public API.
+
+[![DOI](https://zenodo.org/badge/185946239.svg)](https://zenodo.org/badge/latestdoi/185946239)
 
 ## Installation
 Twicorder Search can be installed using PIP:
