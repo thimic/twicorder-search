@@ -10,4 +10,4 @@ from twicorder.exceptions import (
 from twicorder.controller import Twicorder
 
 
-__version__ = '0.2.4'
+__version__ = '0.2.5'

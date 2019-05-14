@@ -20,3 +20,4 @@ COMPANY = 'Zhenyael'
 APP = 'Twicorder'
 
 APP_DATA_TOKEN = 'twicorder'
+DEFAULT_APP_DATA_CONNECTION_TIMEOUT = 5.0

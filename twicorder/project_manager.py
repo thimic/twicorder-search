@@ -3,7 +3,7 @@
 
 import os
 
-from twicorder.constants import DEFAULT_PROJECT_DIR
+from twicorder.constants import APP_DATA_TOKEN, DEFAULT_PROJECT_DIR
 
 
 class _ProjectManager:
@@ -56,11 +56,11 @@ class _ProjectManager:
     
     @property
     def logs(self):
-        return os.path.join(self.logs_dir, 'twicorder.log')
+        return os.path.join(self.logs_dir, f'{APP_DATA_TOKEN}.log')
 
     @property
     def app_data(self):
-        return os.path.join(self.app_data_dir, 'twicorder.sql')
+        return os.path.join(self.app_data_dir, f'{APP_DATA_TOKEN}.sql')
 
 
 ProjectManager = _ProjectManager()

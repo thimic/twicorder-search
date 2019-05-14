@@ -71,6 +71,9 @@ full_user_mentions: True
 # interval (minutes)
 user_lookup_interval: 15
 
+# (Advanced) Number of seconds Twicorder will wait for write locks to be
+# released on its internal data store
+appdata_connection_timeout: 5.0
 
 ```
 

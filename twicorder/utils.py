@@ -12,8 +12,12 @@ from logging import StreamHandler
 
 from logging.handlers import RotatingFileHandler
 
+from twicorder.config import Config
 from twicorder.constants import (
-    REGULAR_EXTENSIONS, COMPRESSED_EXTENSIONS, TW_TIME_FORMAT
+    COMPRESSED_EXTENSIONS,
+    DEFAULT_APP_DATA_CONNECTION_TIMEOUT,
+    REGULAR_EXTENSIONS,
+    TW_TIME_FORMAT,
 )
 from twicorder.project_manager import ProjectManager
 
@@ -62,10 +66,16 @@ class AppData:
     """
 
     def __init__(self):
+        config = Config.get()
+        timeout = (
+            config.get('appdata_connection_timeout') or
+            DEFAULT_APP_DATA_CONNECTION_TIMEOUT
+        )
         self._conn = sqlite3.connect(
             ProjectManager.app_data,
             isolation_level=None,
-            check_same_thread=True
+            check_same_thread=True,
+            timeout=float(timeout)
         )
 
     def __del__(self):
