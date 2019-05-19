@@ -3,11 +3,11 @@
 
 import time
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
-from queue import Queue
-from threading import Thread
+from threading import Lock
 
-from twicorder.utils import TwiLogger
+from twicorder.utils import AppData, TwiLogger
 
 logger = TwiLogger()
 
@@ -17,6 +17,7 @@ class RateLimitCentral:
     Class keeping track of end points and their rate limits.
     """
     _limits = {}
+    _lock = Lock()
 
     @classmethod
     def update(cls, endpoint, header):
@@ -28,14 +29,15 @@ class RateLimitCentral:
             header (dict): Query response header
 
         """
-        limit_keys = {
-            'x-rate-limit-limit',
-            'x-rate-limit-remaining',
-            'x-rate-limit-reset'
-        }
-        if not limit_keys.issubset(header.keys()):
-            return
-        cls._limits[endpoint] = RateLimit(header)
+        with cls._lock:
+            limit_keys = {
+                'x-rate-limit-limit',
+                'x-rate-limit-remaining',
+                'x-rate-limit-reset'
+            }
+            if not limit_keys.issubset(header.keys()):
+                return
+            cls._limits[endpoint] = RateLimit(header)
 
     @classmethod
     def get(cls, endpoint):
@@ -48,7 +50,8 @@ class RateLimitCentral:
             RateLimit: Rate limit object
 
         """
-        return cls._limits.get(endpoint)
+        with cls._lock:
+            return cls._limits.get(endpoint)
 
     @classmethod
     def get_cap(cls, endpoint):
@@ -153,77 +156,50 @@ class RateLimit:
         return self._reset
 
 
-class QueryWorker(Thread):
-    """
-    Queue thread, used to execute queue queries.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super(QueryWorker, self).__init__(*args, **kwargs)
-        self._query = None
-
-    def setup(self, queue):
-        self._queue = queue
-
-    @property
-    def queue(self):
-        return self._queue
-
-    @property
-    def query(self):
-        return self._query
-
-    def run(self):
-        """
-        Fetches query from queue and executes it.
-        """
-        while True:
-            self._query = self.queue.get()
-            if self.query is None:
-                logger.info(f'Terminating thread "{self.name}"')
-                break
-            while not self.query.done:
-                try:
-                    self.query.run()
-                except Exception:
-                    logger.exception('Query failed:\n')
-                    break
-                logger.info(self.query.fetch_log())
-                time.sleep(.2)
-            time.sleep(.5)
-            self.queue.task_done()
-
-
 class QueryExchange:
     """
     Organises queries in queues and executes them after the FIFO principle.
     """
 
-    queues = {}
-    threads = {}
-    failure = False
+    executor = ThreadPoolExecutor(max_workers=None)
 
     @classmethod
-    def get_queue(cls, endpoint):
-        """
-        Retrieves the queue for the given endpoint if it exists, otherwise
-        creates a queue.
+    def on_future_done(cls, future):
+        if future.cancelled():
+            logger.warning(f'Future {future!r} was cancelled.')
+            return
+        query = future.result()
+        if query.results:
+            # Caches found tweet IDs to disk
+            query.bake_ids()
+            logger.info(f'Cached Tweet IDs to disk!')
 
-        Args:
-            endpoint (str): API endpoint
+        # Caches last tweet ID found to disk if the query, including all pages
+        # completed successfully. This saves us from searching all the way back
+        # to the beginning on next crawl. Instead we can stop when we encounter
+        # this tweet.
+        if query.done and query.last_id:
+            logger.info(f'Cached ID of last tweet returned by query to disk.')
+            AppData.set_last_query_id(query.uid, query.last_id)
 
-        Returns:
-            Queue: Queue for endpoint
+        # Re-run the query if there are more pages.
+        if not query.done:
+            cls.add(query)
 
-        """
-        if not cls.queues.get(endpoint):
-            queue = Queue()
-            cls.queues[endpoint] = queue
-            thread = QueryWorker(name=endpoint)
-            thread.setup(queue=queue)
-            thread.start()
-            cls.threads[endpoint] = thread
-        return cls.queues[endpoint]
+    @staticmethod
+    def perform_query(query):
+        attempts = 0
+        while attempts < 9:
+            try:
+                query.run()
+            except Exception:
+                logger.exception('Query failed:\n')
+                attempts += 1
+            else:
+                logger.info(query.fetch_log())
+                break
+            time.sleep(.2 * 2 ** attempts)
+        return query
 
     @classmethod
     def add(cls, query):
@@ -234,32 +210,5 @@ class QueryExchange:
             query (BaseQuery): Query object
 
         """
-        queue = cls.get_queue(query.endpoint)
-        if query in queue.queue:
-            logger.info(f'Query with ID {query.uid} is already in the queue.')
-            return
-        thread = cls.threads.get(query.endpoint)
-        if thread and thread.query == query:
-            logger.info(f'Query with ID {query.uid} is already running.')
-            return
-        queue.put(query)
-
-    @classmethod
-    def clear(cls):
-        """
-        Prepares QueryExchange for a new run.
-        """
-        cls.queues = {}
-        cls.threads = {}
-        cls.failure = False
-
-    @classmethod
-    def wait(cls):
-        """
-        Sends shutdown signal to threads and waits for all threads and queues to
-        terminate.
-        """
-        for queue in cls.queues.values():
-            queue.put_nowait(None)
-        for thread in cls.threads.values():
-            thread.join()
+        future_result = cls.executor.submit(cls.perform_query, query)
+        future_result.add_done_callback(cls.on_future_done)

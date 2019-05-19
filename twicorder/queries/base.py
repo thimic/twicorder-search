@@ -48,7 +48,7 @@ class BaseQuery:
         self._orig_kwargs = copy.deepcopy(kwargs)
         self._log = []
 
-        last_return = AppData().get_last_query_id(self.uid)
+        last_return = AppData.get_last_query_id(self.uid)
         if last_return:
             self.kwargs[self.last_return_token] = last_return
 
@@ -187,7 +187,7 @@ class BaseQuery:
         """
 
         # Loading picked tweet IDs
-        tweets = dict(AppData().get_query_tweets(self.name)) or {}
+        tweets = dict(AppData.get_query_tweets(self.name)) or {}
 
         # Purging tweet IDs older than 14 days
         now = datetime.now()
@@ -206,7 +206,7 @@ class BaseQuery:
             dt = datetime.strptime(created_at, TW_TIME_FORMAT)
             timestamp = int(dt.timestamp())
             new_tweets.append((result['id'], timestamp))
-        AppData().add_query_tweets(self.name, new_tweets)
+        AppData.add_query_tweets(self.name, new_tweets)
 
 
 class RequestQuery(BaseQuery):
@@ -302,6 +302,9 @@ class RequestQuery(BaseQuery):
             if response.status_code == 429:
                 self.log(f'Rate Limit in effect: {response.reason}')
                 self.log(f'Message: {response.json().get("message")}')
+
+                # Update rate limit for query
+                RateLimitCentral.update(self.endpoint, response.headers)
             else:
                 self.log(
                     '<{r.status_code}> {r.reason}: {r.content}'
@@ -340,19 +343,19 @@ class RequestQuery(BaseQuery):
         # Saves and stores IDs for crawled tweets found in the query result.
         # Also records the last tweet ID found.
         if results:
-            self.bake_ids()
-            self.log(f'Cached Tweet IDs to disk!')
+            # self.bake_ids()
+            # self.log(f'Cached Tweet IDs to disk!')
             self.save()
             if self.last_id is None:
                 self.last_id = results[0].get('id_str')
 
-        # Caches last tweet ID found to disk if the query, including all pages
-        # completed successfully. This saves us from searching all the way back
-        # to the beginning on next crawl. Instead we can stop when we encounter
-        # this tweet.
-        if self._done and self.last_id:
-            self.log(f'Cached ID of last tweet returned by query to disk.')
-            AppData().set_last_query_id(self.uid, self.last_id)
+        # # Caches last tweet ID found to disk if the query, including all pages
+        # # completed successfully. This saves us from searching all the way back
+        # # to the beginning on next crawl. Instead we can stop when we encounter
+        # # this tweet.
+        # if self._done and self.last_id:
+        #     self.log(f'Cached ID of last tweet returned by query to disk.')
+        #     AppData.set_last_query_id(self.uid, self.last_id)
 
         # Returning crawled results
         return results

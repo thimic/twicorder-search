@@ -9,6 +9,7 @@ import sys
 from datetime import datetime
 from gzip import GzipFile
 from logging import StreamHandler
+from threading import Lock
 
 from logging.handlers import RotatingFileHandler
 
@@ -65,109 +66,117 @@ class AppData:
     Class for reading and writing AppData to be used between sessions.
     """
 
-    def __init__(self):
-        config = Config.get()
-        timeout = (
-            config.get('appdata_connection_timeout') or
-            DEFAULT_APP_DATA_CONNECTION_TIMEOUT
-        )
-        self._conn = sqlite3.connect(
-            ProjectManager.app_data,
-            isolation_level=None,
-            check_same_thread=True,
-            timeout=float(timeout)
-        )
+    _config = Config.get()
+    _timeout = (
+        _config.get('appdata_connection_timeout') or
+        DEFAULT_APP_DATA_CONNECTION_TIMEOUT
+    )
+    _con = sqlite3.connect(
+        ProjectManager.app_data,
+        check_same_thread=False,
+        timeout=float(_timeout)
+    )
+    _lock = Lock()
 
     def __del__(self):
-        self._conn.close()
+        self._con.close()
 
-    def _make_query_table(self, name):
-        cursor = self._conn.cursor()
-        cursor.execute(
-            f'''
-            CREATE TABLE IF NOT EXISTS [{name}] (
-                tweet_id INTEGER PRIMARY KEY,
-                timestamp INTEGER NOT NULL
+    @classmethod
+    def _make_query_table(cls, name):
+        with cls._lock, cls._con as con:
+            con.execute(
+                f'''
+                CREATE TABLE IF NOT EXISTS [{name}] (
+                    tweet_id INTEGER PRIMARY KEY,
+                    timestamp INTEGER NOT NULL
+                )
+                '''
             )
-            '''
-        )
 
-    def _make_last_id_table(self):
-        cursor = self._conn.cursor()
-        cursor.execute(
-            '''
-            CREATE TABLE IF NOT EXISTS queries_last_id (
-                query_hash TEXT PRIMARY KEY,
-                tweet_id INTEGER NOT NULL
+    @classmethod
+    def _make_last_id_table(cls):
+        with cls._lock, cls._con as con:
+            con.execute(
+                '''
+                CREATE TABLE IF NOT EXISTS queries_last_id (
+                    query_hash TEXT PRIMARY KEY,
+                    tweet_id INTEGER NOT NULL
+                )
+                '''
             )
-            '''
-        )
 
-    def add_query_tweet(self, query_name, tweet_id, timestamp):
-        self._make_query_table(query_name)
-        cursor = self._conn.cursor()
-        cursor.execute(
-            f'''
-            INSERT OR REPLACE INTO {query_name} VALUES (
-                ?, ?
+    @classmethod
+    def add_query_tweet(cls, query_name, tweet_id, timestamp):
+        cls._make_query_table(query_name)
+        with cls._lock, cls._con as con:
+            con.execute(
+                f'''
+                INSERT OR REPLACE INTO {query_name} VALUES (
+                    ?, ?
+                )
+                ''',
+                (tweet_id, timestamp)
             )
-            ''',
-            (tweet_id, timestamp)
-        )
 
-    def add_query_tweets(self, query_name, tweets):
-        self._make_query_table(query_name)
-        cursor = self._conn.cursor()
-        cursor.executemany(
-            f'''
-            INSERT OR REPLACE INTO {query_name} VALUES (
-                ?, ?
+    @classmethod
+    def add_query_tweets(cls, query_name, tweets):
+        cls._make_query_table(query_name)
+        with cls._lock, cls._con as con:
+            con.executemany(
+                f'''
+                INSERT OR REPLACE INTO {query_name} VALUES (
+                    ?, ?
+                )
+                ''',
+                tweets
             )
-            ''',
-            tweets
-        )
 
-    def get_query_tweets(self, query_name):
-        self._make_query_table(query_name)
-        cursor = self._conn.cursor()
-        cursor.execute(
-            f'''
-            SELECT DISTINCT
-                tweet_id, timestamp
-            FROM
-                {query_name}
-            '''
-        )
-        return cursor.fetchall()
-
-    def set_last_query_id(self, query_hash, tweet_id):
-        self._make_last_id_table()
-        cursor = self._conn.cursor()
-        cursor.execute(
-            '''
-            INSERT OR REPLACE INTO queries_last_id VALUES (
-                ?, ?
+    @classmethod
+    def get_query_tweets(cls, query_name):
+        cls._make_query_table(query_name)
+        with cls._lock, cls._con as con:
+            cursor = con.cursor()
+            cursor.execute(
+                f'''
+                SELECT DISTINCT
+                    tweet_id, timestamp
+                FROM
+                    {query_name}
+                '''
             )
-            ''',
-            (query_hash, tweet_id)
-        )
+            return cursor.fetchall()
 
-    def get_last_query_id(self, query_hash):
-        self._make_last_id_table()
-        cursor = self._conn.cursor()
-        cursor.execute(
-            '''
-            SELECT
-            DISTINCT
-                tweet_id
-            FROM
-                queries_last_id
-            WHERE
-                query_hash=?
-            ''',
-            (query_hash,)
-        )
-        result = cursor.fetchone()
+    @classmethod
+    def set_last_query_id(cls, query_hash, tweet_id):
+        cls._make_last_id_table()
+        with cls._lock, cls._con as con:
+            con.execute(
+                '''
+                INSERT OR REPLACE INTO queries_last_id VALUES (
+                    ?, ?
+                )
+                ''',
+                (query_hash, tweet_id)
+            )
+
+    @classmethod
+    def get_last_query_id(cls, query_hash):
+        cls._make_last_id_table()
+        with cls._lock, cls._con as con:
+            cursor = con.cursor()
+            cursor.execute(
+                '''
+                SELECT
+                DISTINCT
+                    tweet_id
+                FROM
+                    queries_last_id
+                WHERE
+                    query_hash=?
+                ''',
+                (query_hash,)
+            )
+            result = cursor.fetchone()
         if not result:
             return
         return result[0]

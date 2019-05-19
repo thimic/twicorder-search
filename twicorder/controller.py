@@ -43,6 +43,13 @@ class WorkerThread(Thread):
         logger.info(' Loading tasks '.center(80, '='))
         logger.info('')
         while self._running:
+            if not self._tasks:
+                logger.warning(
+                    f'No tasks found in {ProjectManager.tasks!r}. Aborting.\n'
+                    f'\n'
+                    f'{"=" * 80}'
+                )
+                return
             update = False
             for task in self._tasks:
                 if not task.due:
@@ -175,5 +182,5 @@ class Twicorder:
 
 
 if __name__ == '__main__':
-    twicorder = Twicorder('~/Desktop/Twicorder')
+    twicorder = Twicorder('~/Desktop/twicorder_test')
     twicorder.run()
