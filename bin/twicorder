@@ -4,6 +4,7 @@
 import click
 import sys
 import traceback
+import faulthandler
 
 
 @click.command('Twicorder Search')
@@ -17,6 +18,7 @@ def main(project_dir):
     """
     Twicorder Search
     """
+    faulthandler.enable()
     from twicorder.controller import Twicorder
 
     twicorder = Twicorder(project_dir=project_dir)

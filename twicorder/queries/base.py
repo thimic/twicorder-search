@@ -48,7 +48,7 @@ class BaseQuery:
         self._orig_kwargs = copy.deepcopy(kwargs)
         self._log = []
 
-        last_return = AppData().get_last_query_id(self.uid)
+        last_return = AppData.get_last_query_id(self.uid)
         if last_return:
             self.kwargs[self.last_return_token] = last_return
 
@@ -187,7 +187,7 @@ class BaseQuery:
         """
 
         # Loading picked tweet IDs
-        tweets = dict(AppData().get_query_tweets(self.name)) or {}
+        tweets = dict(AppData.get_query_tweets(self.name)) or {}
 
         # Purging tweet IDs older than 14 days
         now = datetime.now()
@@ -206,7 +206,7 @@ class BaseQuery:
             dt = datetime.strptime(created_at, TW_TIME_FORMAT)
             timestamp = int(dt.timestamp())
             new_tweets.append((result['id'], timestamp))
-        AppData().add_query_tweets(self.name, new_tweets)
+        AppData.add_query_tweets(self.name, new_tweets)
 
 
 class RequestQuery(BaseQuery):
@@ -352,7 +352,7 @@ class RequestQuery(BaseQuery):
         # this tweet.
         if self._done and self.last_id:
             self.log(f'Cached ID of last tweet returned by query to disk.')
-            AppData().set_last_query_id(self.uid, self.last_id)
+            AppData.set_last_query_id(self.uid, self.last_id)
 
         # Returning crawled results
         return results
