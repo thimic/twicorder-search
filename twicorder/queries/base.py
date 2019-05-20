@@ -289,7 +289,6 @@ class RequestQuery(BaseQuery):
                     response = request(self.request_url)
             except Exception:
                 attempts += 1
-                self.log(traceback.format_exc())
                 time.sleep(2**attempts)
                 if attempts >= 5:
                     raise
