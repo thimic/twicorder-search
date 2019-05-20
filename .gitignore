@@ -25,6 +25,7 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+build.py
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -109,9 +110,6 @@ auth.yaml
 # File system
 .DS_Store
 thumbs.db
-
-# Sandbox tests
-python/twicorder/sandbox/
 
 # Migrations
 migrations/

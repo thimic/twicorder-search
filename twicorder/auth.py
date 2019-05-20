@@ -44,7 +44,7 @@ class Auth:
         """
         if not (cls._consumer_key and cls._consumer_secret):
             raise NoCredentialsException
-        if not cls._session or not cls._session.authorized:
+        if not cls._session:
             cls._session = OAuth1Session(
                 client_key=cls._consumer_key,
                 client_secret=cls._consumer_secret
