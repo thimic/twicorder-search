@@ -15,21 +15,6 @@ class Auth:
     """
     Class for handling API authentication.
     """
-
-    _config = Config.get()
-    _consumer_key = (
-        _config.get('consumer_key') or os.getenv('TWITTER_CONSUMER_KEY')
-    )
-    _consumer_secret = (
-        _config.get('consumer_secret') or os.getenv('TWITTER_CONSUMER_SECRET')
-    )
-    _access_token = (
-        _config.get('access_token') or os.getenv('TWITTER_ACCESS_TOKEN')
-    )
-    _access_secret = (
-        _config.get('access_secret') or os.getenv('TWITTER_ACCESS_SECRET')
-    )
-
     _session = None
     _bearer_token = None
 
@@ -42,12 +27,12 @@ class Auth:
             OAuth1Session: Logged in session
 
         """
-        if not (cls._consumer_key and cls._consumer_secret):
+        if not (Config.consumer_key and Config.consumer_secret):
             raise NoCredentialsException
         if not cls._session:
             cls._session = OAuth1Session(
-                client_key=cls._consumer_key,
-                client_secret=cls._consumer_secret
+                client_key=Config.consumer_key,
+                client_secret=Config.consumer_secret
             )
         return cls._session
 
@@ -60,7 +45,7 @@ class Auth:
             OAuth2Bearer: Token object
 
         """
-        if not (cls._consumer_key and cls._consumer_secret):
+        if not (Config.consumer_key and Config.consumer_secret):
             raise NoCredentialsException
         if not cls._bearer_token:
             resp = requests.post(

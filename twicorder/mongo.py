@@ -14,7 +14,6 @@ from pymongo.errors import ServerSelectionTimeoutError
 
 from twicorder import utils
 from twicorder.config import Config
-from twicorder.project_manager import ProjectManager
 from twicorder.utils import TwiLogger
 
 logger = TwiLogger()
@@ -99,7 +98,7 @@ def backfill(path=None, db_name='twicorder', collection_name='tweets'):
     logger = TwiLogger()
     tweets = create_collection(db_name, collection_name)
 
-    save_dir = os.path.expanduser(path or ProjectManager.output_dir)
+    save_dir = os.path.expanduser(path or Config.output_dir)
 
     paths = glob.glob(os.path.join(save_dir, '**', '*.t*'), recursive=True)
     t0 = datetime.now()

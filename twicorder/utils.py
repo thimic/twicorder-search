@@ -20,7 +20,6 @@ from twicorder.constants import (
     REGULAR_EXTENSIONS,
     TW_TIME_FORMAT,
 )
-from twicorder.project_manager import ProjectManager
 
 
 class TwiLogger:
@@ -31,7 +30,7 @@ class TwiLogger:
     def setup(cls):
         cls._logger = logging.getLogger('Twicorder')
         file_handler = RotatingFileHandler(
-            ProjectManager.logs,
+            Config.logs,
             maxBytes=1024**2 * 10,
             backupCount=5
         )
@@ -66,13 +65,11 @@ class AppData:
     Class for reading and writing AppData to be used between sessions.
     """
 
-    _config = Config.get()
     _timeout = (
-        _config.get('appdata_connection_timeout') or
-        DEFAULT_APP_DATA_CONNECTION_TIMEOUT
+        Config.appdata_connection_timeout or DEFAULT_APP_DATA_CONNECTION_TIMEOUT
     )
     _con = sqlite3.connect(
-        ProjectManager.app_data,
+        Config.app_data,
         check_same_thread=False,
         timeout=float(_timeout)
     )
@@ -101,6 +98,18 @@ class AppData:
                 CREATE TABLE IF NOT EXISTS queries_last_id (
                     query_hash TEXT PRIMARY KEY,
                     tweet_id INTEGER NOT NULL
+                )
+                '''
+            )
+
+    @classmethod
+    def _make_user_id_table(cls, name):
+        with cls._lock, cls._con as con:
+            con.execute(
+                f'''
+                CREATE TABLE IF NOT EXISTS [{name}] (
+                    user_id INTEGER PRIMARY KEY,
+                    timestamp INTEGER NOT NULL
                 )
                 '''
             )
@@ -140,6 +149,47 @@ class AppData:
                 f'''
                 SELECT DISTINCT
                     tweet_id, timestamp
+                FROM
+                    {query_name}
+                '''
+            )
+            return cursor.fetchall()
+
+    @classmethod
+    def add_user_id(cls, query_name, user_id, timestamp):
+        cls._make_user_id_table(query_name)
+        with cls._lock, cls._con as con:
+            con.execute(
+                f'''
+                INSERT OR REPLACE INTO {query_name} VALUES (
+                    ?, ?
+                )
+                ''',
+                (user_id, timestamp)
+            )
+
+    @classmethod
+    def add_user_ids(cls, query_name, user_ids):
+        cls._make_user_id_table(query_name)
+        with cls._lock, cls._con as con:
+            con.executemany(
+                f'''
+                INSERT OR REPLACE INTO {query_name} VALUES (
+                    ?, ?
+                )
+                ''',
+                user_ids
+            )
+
+    @classmethod
+    def get_user_ids(cls, query_name):
+        cls._make_user_id_table(query_name)
+        with cls._lock, cls._con as con:
+            cursor = con.cursor()
+            cursor.execute(
+                f'''
+                SELECT DISTINCT
+                    user_id, timestamp
                 FROM
                     {query_name}
                 '''

@@ -12,7 +12,7 @@ from twicorder.queries import RequestQuery
 
 class UserQuery(RequestQuery):
 
-    name = 'user'
+    name = 'cached_user'
     endpoint = '/users/lookup'
 
     def __init__(self, output=None, **kwargs):
@@ -111,12 +111,8 @@ class CachedUserCentral:
     """
 
     users = {}
-    _config = Config.get()
     _cache_life = timedelta(
-        minutes=_config.get(
-            'user_lookup_interval',
-            DEFAULT_EXPAND_USERS_INTERVAL
-        )
+        minutes=Config.user_lookup_interval or DEFAULT_EXPAND_USERS_INTERVAL
     )
     lock = Lock()
 

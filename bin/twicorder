@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import click
@@ -7,26 +7,20 @@ import traceback
 import faulthandler
 
 
-@click.command('Twicorder Search')
-@click.option(
-    '--project-dir',
-    type=str,
-    default=None,
-    help='Path to project dir. Default is ~/Twicorder.'
-)
-def main(project_dir):
+def main():
     """
     Twicorder Search
     """
     faulthandler.enable()
     from twicorder.controller import Twicorder
 
-    twicorder = Twicorder(project_dir=project_dir)
+    twicorder = Twicorder()
     try:
         twicorder.run()
     except Exception:
         click.echo(traceback.format_exc())
         sys.exit(1)
+
 
 if __name__ == '__main__':
     main()

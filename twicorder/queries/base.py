@@ -20,8 +20,7 @@ from twicorder.constants import (
     DEFAULT_OUTPUT_EXTENSION,
     TW_TIME_FORMAT
 )
-from twicorder.exchange import RateLimitCentral
-from twicorder.project_manager import ProjectManager
+from twicorder.rate_limits import RateLimitCentral
 from twicorder.utils import write, AppData, timestamp_to_datetime
 
 
@@ -35,6 +34,7 @@ class BaseQuery:
     _last_return_token = None
     _results_path = None
     _fetch_more_path = None
+    _type = 'tweet'
 
     _mongo_collection = None
 
@@ -63,10 +63,6 @@ class BaseQuery:
         return f'{self.endpoint}\n{"-" * 80}\n{yaml.dump(self.kwargs)}'
 
     @property
-    def config(self):
-        return Config.get()
-
-    @property
     def output(self):
         return self._output
 
@@ -89,6 +85,10 @@ class BaseQuery:
     @property
     def fetch_more_path(self):
         return self._fetch_more_path
+
+    @property
+    def type(self):
+        return self._type
 
     @property
     def uid(self):
@@ -120,7 +120,7 @@ class BaseQuery:
 
     @property
     def mongo_collection(self):
-        if not self.config.get('use_mongo', DEFAULT_MONGO_OUTPUT):
+        if not Config.use_mongo or DEFAULT_MONGO_OUTPUT:
             return
         from twicorder import mongo
         collection = self._mongo_collection
@@ -143,13 +143,8 @@ class BaseQuery:
     def save(self):
         if not self._results or not self._output:
             return
-        save_dir = os.path.join(
-            ProjectManager.output_dir,
-            self._output or self.uid
-        )
-        extension = (
-            self.config.get('save_extension') or DEFAULT_OUTPUT_EXTENSION
-        )
+        save_dir = os.path.join(Config.output_dir,  self._output or self.uid)
+        extension = Config.save_extension or DEFAULT_OUTPUT_EXTENSION
         marker = self._results[0]
         stamp = datetime.strptime(marker['created_at'], TW_TIME_FORMAT)
         uid = marker['id']
@@ -340,9 +335,9 @@ class RequestQuery(BaseQuery):
         # Also records the last tweet ID found.
         if results:
             self.bake_ids()
-            self.log(f'Cached Tweet IDs to disk!')
+            self.log(f'Cached {self.type.title()} IDs to disk!')
             self.save()
-            if self.last_id is None:
+            if self.type == 'tweet' and self.last_id is None:
                 self.last_id = results[0].get('id_str')
 
         # Caches last tweet ID found to disk if the query, including all pages
@@ -355,3 +350,56 @@ class RequestQuery(BaseQuery):
 
         # Returning crawled results
         return results
+
+
+class UserBaseQuery(RequestQuery):
+
+    _type = 'user'
+
+    def __init__(self, output=None, **kwargs):
+        super(UserBaseQuery, self).__init__(output, **kwargs)
+        self._kwargs.update(kwargs)
+
+    def bake_ids(self):
+        """
+        Saves a cache of user IDs from query result to disk. In storing the IDs
+        between sessions, we ensure crawled data is not lost between sessions.
+
+        To prevent the disk cache growing too large, we purge IDs for users
+        crawled more than 14 days ago.
+        """
+
+        # Loading picked tweet IDs
+        users = dict(AppData.get_user_ids(self.name)) or {}
+
+        # Purging tweet IDs older than 14 days
+        now = datetime.now()
+        old_users = users.copy()
+        users = {}
+        for user_id, timestamp in old_users.items():
+            dt = datetime.fromtimestamp(timestamp)
+            if not now - dt > timedelta(days=14):
+                users[user_id] = timestamp
+
+        # Stores tweet IDs from result
+        self._results = [u for u in self.results if u['id'] not in users]
+        new_users = []
+        for result in self.results:
+            dt = datetime.utcnow()
+            timestamp = int(dt.timestamp())
+            new_users.append((result['id'], timestamp))
+        AppData.add_user_ids(self.name, new_users)
+
+    def save(self):
+        if not self._results or not self._output:
+            return
+        save_dir = os.path.join(Config.output_dir, self._output or self.uid)
+        extension = Config.save_extension or DEFAULT_OUTPUT_EXTENSION
+        marker = self._results[0]
+        stamp = datetime.utcnow()
+        uid = marker['id']
+        filename = f'{stamp:%Y-%m-%d_%H-%M-%S}_{uid}{extension}'
+        file_path = os.path.join(save_dir, filename)
+        results_str = '\n'.join(json.dumps(r) for r in self._results)
+        write(f'{results_str}\n', file_path)
+        self.log(f'Wrote {len(self.results)} tweets to "{file_path}"')

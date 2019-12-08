@@ -10,11 +10,11 @@ class NoConfigException(TwicorderException):
 
     def __init__(self, *args, **kwargs):
         if not args:
-            from twicorder.project_manager import ProjectManager
+            from twicorder.config import Config
             args = [(
                 f'\n'
                 f'No configuration file could be found for this project '
-                f'({ProjectManager.project_dir}). Configs are installed to '
+                f'({Config.project_dir}). Configs are installed to '
                 f'<PROJECT_ROOT>/config/preferences.yaml.\n'
                 f'\n'
                 f'To set a different project directory, please run Twicorder '
@@ -33,11 +33,11 @@ class NoTasksException(TwicorderException):
 
     def __init__(self, *args, **kwargs):
         if not args:
-            from twicorder.project_manager import ProjectManager
+            from twicorder.config import Config
             args = [(
                 f'\n'
                 f'No tasks file could be found for this project '
-                f'({ProjectManager.project_dir}). Tasks are installed to '
+                f'({Config.project_dir}). Tasks are installed to '
                 f'<PROJECT_ROOT>/config/tasks.yaml.\n'
                 f'\n'
                 f'To set a different project directory, please run Twicorder '
