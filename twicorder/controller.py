@@ -26,7 +26,6 @@ class Twicorder:
             from twicorder.config import Config
             from twicorder.tasks import TaskManager
             from twicorder.auth import Auth
-            Config.get()
             TaskManager.load()
             Auth.session()
         except TwicorderException as error:

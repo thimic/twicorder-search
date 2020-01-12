@@ -28,6 +28,8 @@ class TwiLogger:
 
     @classmethod
     def setup(cls):
+        if not os.path.exists(Config.log_dir):
+            os.makedirs(Config.log_dir)
         cls._logger = logging.getLogger('Twicorder')
         file_handler = RotatingFileHandler(
             Config.logs,
@@ -68,8 +70,10 @@ class AppData:
     _timeout = (
         Config.appdata_connection_timeout or DEFAULT_APP_DATA_CONNECTION_TIMEOUT
     )
+    if not os.path.exists(Config.appdata_dir):
+        os.makedirs(Config.appdata_dir)
     _con = sqlite3.connect(
-        Config.app_data,
+        Config.appdata,
         check_same_thread=False,
         timeout=float(_timeout)
     )
