@@ -1,136 +1,213 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import click
-import datetime
 import os
-import yaml
 
 from twicorder.constants import (
     APP_DATA_TOKEN,
-    DEFAULT_CONFIG_RELOAD_INTERVAL,
-    DEFAULT_PROJECT_DIR,
+    DEFAULT_APP_DATA_CONNECTION_TIMEOUT,
+    DEFAULT_EXPAND_USERS_INTERVAL,
+    DEFAULT_OUTPUT_EXTENSION,
+    DEFAULT_PROJECT_DIR
 )
 
 
-class _Config(dict):
-    """
-    Class for reading config file. Re-checking file on disk after a set
-    interval to pick up changes.
-    """
-    _cache_time = None
+Config = None
 
-    @staticmethod
-    @click.command()
-    @click.option('--project-dir')
-    @click.option('--output-dir')
-    @click.option('--out-extension')
-    @click.option('--consumer-key')
-    @click.option('--consumer-secret')
-    @click.option('--access-token')
-    @click.option('--access-secret')
-    def _read(project_dir, output_dir, out_extension,
-              consumer_key, consumer_secret, access_token, access_secret):
+
+class _Config:
+
+    def __init__(self, consumer_key: str, consumer_secret: str,
+                 access_token: str, access_secret: str, project_dir: str,
+                 out_dir: str, out_extension: str, task_file: str,
+                 use_mongo: bool, full_user_mentions: bool,
+                 user_lookup_interval: int, appdata_timeout: float):
         """
-        Reading config file from disk and parsing to a dictionary using the
-        yaml module. Environment variables overrides keys in the yaml file.
+        Gets config attributes from command line arguments or environment
+        variables.
+
+        Environment variables are prefixed with "TWICORDER" and otherwise match
+        upper cased versions of command line arguments. "--project-dir" becomes
+        "TWICORDER_PROJECT_DIR" for instance.
 
         Args:
-            project_dir (str): Project directory
-            output_dir (str): Save directory for recorded tweets
-            out_extension (str): File extension for recorded tweets, i.e. '.zip'
             consumer_key (str): Twitter consumer key
             consumer_secret (str): Twitter consumer secret
             access_token (str): Twitter access token
             access_secret (str): Twitter access secret
-
-        Returns:
-            dict: Config object
-
-        """
-        if not project_dir:
-            project_dir = DEFAULT_PROJECT_DIR
-        config_path = os.path.join(project_dir, 'config')
-        if os.path.isfile(config_path):
-            with open(os.path.join(project_dir, 'config'), 'r') as stream:
-                data = yaml.full_load(stream)
-        else:
-            data = {}
-        if project_dir:
-            data['project_dir'] = project_dir
-        if output_dir:
-            data['save_dir'] = output_dir
-        if out_extension:
-            data['save_extension'] = out_extension
-        if consumer_key:
-            data['consumer_key'] = consumer_key
-        if consumer_secret:
-            data['consumer_secret'] = consumer_secret
-        if access_token:
-            data['access_token'] = access_token
-        if access_secret:
-            data['access_secret'] = access_secret
-
-        data['config_dir'] = os.path.join(data['project_dir'], 'config')
-        data['preferences'] = os.path.join(
-            data['config_dir'], 'preferences.yaml'
-        )
-        data['tasks'] = os.path.join(data['config_dir'], 'tasks.yaml')
-        data['appdata_dir'] = os.path.join(data['project_dir'], 'appdata')
-        data['appdata'] = os.path.join(
-            data['appdata_dir'], f'{APP_DATA_TOKEN}.sql'
-        )
-        data['log_dir'] = os.path.join(data['project_dir'], 'logs')
-        data['logs'] = os.path.join(data['log_dir'], f'{APP_DATA_TOKEN}.log')
-        return data
-
-    def _load(self):
-        """
-        Load config data from file or environment variables. Reload if
-        reload_interval has been exceeded.
-        """
-        reload_interval = (
-            self.get('config_reload_interval') or DEFAULT_CONFIG_RELOAD_INTERVAL
-        )
-        max_interval = datetime.timedelta(seconds=reload_interval)
-        if (self._cache_time is None
-                or datetime.datetime.now() - self._cache_time > max_interval):
-            data = self._read(
-                auto_envvar_prefix='TWICORDER',
-                standalone_mode=False
-            )
-            self.update(data)
-            self._cache_time = datetime.datetime.now()
-
-    def __getitem__(self, item):
-        """
-        Return config attribute value for the given name. Reload config before
-        returning value if reload_interval has been exceeded.
-
-        Args:
-            item (str): Config attribute name
-
-        Returns:
-            object: Config attribute value
+            project_dir (str): Project directory
+            out_dir (str): Save directory for recorded tweets
+            out_extension (str): File extension for recorded tweets, i.e. '.zip'
+            task_file (str): Path to YAML file containing tasks to execute
+            use_mongo (bool): Additionally store tweets in MongoDB
+            full_user_mentions (bool): For mentions, look up full user data
+            user_lookup_interval (int): Minutes between lookups of the same user
+            appdata_timeout (float): Seconds to timeout for internal data store
 
         """
-        self._load()
-        return super(_Config, self).__getitem__(item)
+        self._consumer_key = consumer_key
+        self._consumer_secret = consumer_secret
+        self._access_token = access_token
+        self._access_secret = access_secret
 
-    def __getattr__(self, item):
+        self._project_dir = project_dir or DEFAULT_PROJECT_DIR
+        self._out_dir = out_dir or os.path.join(self._project_dir, 'output')
+        self._out_extension = out_extension or DEFAULT_OUTPUT_EXTENSION
+        self._task_file = task_file or os.path.join(self._project_dir, 'tasks.yaml')
+
+        self._use_mongo = use_mongo
+        self._full_user_mentions = full_user_mentions
+        self._user_lookup_interval = user_lookup_interval
+        self._appdata_timeout = appdata_timeout
+
+    @property
+    def consumer_key(self) -> str:
         """
-        Return config attribute value for the given name. Reload config before
-        returning value if reload_interval has been exceeded.
-
-        Args:
-            item (str): Config attribute name
-
-        Returns:
-            object: Config attribute value
-
+        Twitter consumer key.
         """
-        self._load()
-        return self.get(item)
+        return self._consumer_key
+
+    @property
+    def consumer_secret(self) -> str:
+        """
+        Twitter consumer secret.
+        """
+        return self._consumer_secret
+
+    @property
+    def access_token(self) -> str:
+        """
+        Twitter access token.
+        """
+        return self._access_token
+
+    @property
+    def access_secret(self) -> str:
+        """
+        Twitter access secret.
+        """
+        return self._access_secret
+
+    @property
+    def project_dir(self) -> str:
+        """
+        Project directory.
+        """
+        return self._project_dir
+
+    @property
+    def out_dir(self) -> str:
+        """
+        Save directory for recorded tweets.
+        """
+        return self._out_dir
+
+    @property
+    def out_extension(self) -> str:
+        """
+        File extension for recorded tweets, i.e. '.zip'.
+        """
+        return self._out_extension
+
+    @property
+    def task_file(self) -> str:
+        """
+        Path to YAML file containing tasks to execute.
+        """
+        return self._task_file
+
+    @property
+    def use_mongo(self) -> bool:
+        """
+        Additionally store tweets in MongoDB.
+        """
+        return self._use_mongo
+
+    @property
+    def full_user_mentions(self) -> bool:
+        """
+        For mentions, look up full user data.
+        """
+        return self._full_user_mentions
+
+    @property
+    def user_lookup_interval(self) -> int:
+        """
+        Minutes between lookups of the same user.
+        """
+        return self._user_lookup_interval
+
+    @property
+    def appdata_timeout(self) -> float:
+        """
+        Seconds to timeout for internal data store.
+        """
+        return self._appdata_timeout
+
+    @property
+    def appdata_dir(self) -> str:
+        """
+        Directory for storing internal data.
+        """
+        return os.path.join(self._project_dir, 'appdata')
+
+    @property
+    def appdata(self) -> str:
+        """
+        SQLite file for storing internal data.
+        """
+        return os.path.join(self.appdata_dir, f'{APP_DATA_TOKEN}.sql')
+
+    @property
+    def log_dir(self) -> str:
+        """
+        Log directory.
+        """
+        return os.path.join(self._project_dir, 'logs')
+
+    @property
+    def logs(self) -> str:
+        """
+        Log file.
+        """
+        return os.path.join(self.log_dir, f'{APP_DATA_TOKEN}.log')
 
 
-Config = _Config()
+def load(consumer_key=None, consumer_secret=None, access_token=None,
+         access_secret=None, project_dir=None, out_dir=None, out_extension=None,
+         task_file=None, use_mongo=False, full_user_mentions=False,
+         user_lookup_interval=DEFAULT_EXPAND_USERS_INTERVAL,
+         appdata_timeout=DEFAULT_APP_DATA_CONNECTION_TIMEOUT):
+    """
+    Function to populate config and assign it to twicorder.config.Config.
+
+    Args:
+        consumer_key (str): Twitter consumer key
+        consumer_secret (str): Twitter consumer secret
+        access_token (str): Twitter access token
+        access_secret (str): Twitter access secret
+        project_dir (str): Project directory
+        out_dir (str): Save directory for recorded tweets
+        out_extension (str): File extension for recorded tweets, i.e. '.zip'
+        task_file (str): Path to YAML file containing tasks to execute
+        use_mongo (bool): Additionally store tweets in MongoDB
+        full_user_mentions (bool): For mentions, look up full user data
+        user_lookup_interval (int): Minutes between lookups of the same user
+        appdata_timeout (float): Seconds to timeout for internal data store
+
+    """
+    global Config
+    Config = _Config(
+        consumer_key=consumer_key,
+        consumer_secret=consumer_secret,
+        access_token=access_token,
+        access_secret=access_secret,
+        project_dir=project_dir,
+        out_extension=out_extension,
+        out_dir=out_dir,
+        task_file=task_file,
+        use_mongo=use_mongo,
+        full_user_mentions=full_user_mentions,
+        user_lookup_interval=user_lookup_interval,
+        appdata_timeout=appdata_timeout
+    )

@@ -73,9 +73,9 @@ class TaskManager:
         Reading tasks from yaml file and parsing to a dictionary.
         """
         cls._tasks = []
-        if not os.path.isfile(Config.tasks):
+        if not os.path.isfile(Config.task_file):
             raise NoTasksException
-        with open(Config.tasks, 'r') as stream:
+        with open(Config.task_file, 'r') as stream:
             raw_tasks = yaml.full_load(stream)
         for query, tasks in raw_tasks.items():
             for raw_task in tasks or []:

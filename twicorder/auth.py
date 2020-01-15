@@ -50,7 +50,7 @@ class Auth:
         if not cls._bearer_token:
             resp = requests.post(
                 'https://api.twitter.com/oauth2/token',
-                auth=(os.getenv('CONSUMER_KEY'), os.getenv('CONSUMER_SECRET')),
+                auth=(Config.consumer_key, Config.consumer_secret),
                 data={'grant_type': 'client_credentials'}
             )
             data = resp.json()

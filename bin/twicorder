@@ -6,14 +6,107 @@ import sys
 import traceback
 import faulthandler
 
+from twicorder.constants import (
+    DEFAULT_EXPAND_USERS_INTERVAL,
+    DEFAULT_APP_DATA_CONNECTION_TIMEOUT,
+)
 
-def main():
+
+@click.group()
+@click.option('--project-dir', help='Root directory for project')
+@click.pass_context
+def cli(ctx, project_dir):
     """
     Twicorder Search
     """
     faulthandler.enable()
-    from twicorder.controller import Twicorder
+    ctx.obj = dict(project_dir=project_dir)
 
+
+@cli.command()
+@click.option(
+    '--clear-cache',
+    is_flag=True,
+    default=False,
+    help='Clear cache and exit'
+)
+@click.option(
+    '--purge-logs',
+    is_flag=True,
+    default=False,
+    help='Purge logs and exit'
+)
+@click.pass_context
+def utils(ctx, clear_cache, purge_logs):
+    """
+    Utility functions
+    """
+    from twicorder import config
+    config.load(
+        project_dir=ctx.obj['project_dir'],
+    )
+    from twicorder.controller import Twicorder
+    Twicorder(clear_cache=clear_cache, purge_logs=purge_logs)
+
+
+@cli.command()
+@click.option('--consumer-key', help='Twitter consumer key', required=True)
+@click.option('--consumer-secret', help='Twitter consumer secret', required=True)
+@click.option('--access-token', help='Twitter access token', required=True)
+@click.option('--access-secret', help='Twitter access secret', required=True)
+@click.option('--out-dir', help='Custom output dir for crawled data')
+@click.option(
+    '--out-extension',
+    help='File extension for crawled files (.txt or .zip)'
+)
+@click.option('--task-file', help='Yaml file containing tasks to execute')
+@click.option(
+    '--use-mongo',
+    is_flag=True,
+    default=False,
+    help='Additionally store tweets in MongoDB'
+)
+@click.option(
+    '--full-user-mentions',
+    is_flag=True,
+    default=False,
+    help='For mentions, look up full user data'
+)
+@click.option(
+    '--user-lookup-interval',
+    default=DEFAULT_EXPAND_USERS_INTERVAL,
+    show_default=True,
+    help='Minutes between lookups of the same user'
+)
+@click.option(
+    '--appdata-timeout',
+    default=DEFAULT_APP_DATA_CONNECTION_TIMEOUT,
+    show_default=True,
+    help='Seconds to timeout for internal data store'
+)
+@click.pass_context
+def run(ctx, consumer_key, consumer_secret, access_token, access_secret,
+        out_dir, out_extension, task_file, use_mongo, full_user_mentions,
+        user_lookup_interval, appdata_timeout):
+    """
+    Start crawler
+    """
+    from twicorder import config
+    config.load(
+        consumer_key=consumer_key,
+        consumer_secret=consumer_secret,
+        access_token=access_token,
+        access_secret=access_secret,
+        project_dir=ctx.obj['project_dir'],
+        out_dir=out_dir,
+        out_extension=out_extension,
+        task_file=task_file,
+        use_mongo=use_mongo,
+        full_user_mentions=full_user_mentions,
+        user_lookup_interval=user_lookup_interval,
+        appdata_timeout=appdata_timeout
+    )
+    from twicorder.controller import Twicorder
     twicorder = Twicorder()
     try:
         twicorder.run()
@@ -23,4 +116,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    cli(auto_envvar_prefix='TWICORDER')

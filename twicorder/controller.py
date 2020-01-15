@@ -2,10 +2,12 @@
 # -*- coding: utf-8 -*-
 
 import inspect
+import os
 import sys
 import time
 
 from twicorder import TwicorderException
+from twicorder.config import Config
 from twicorder.utils import TwiLogger
 
 logger = TwiLogger()
@@ -15,15 +17,29 @@ class Twicorder:
     """
     Twicorder controller class.
     """
-    def __init__(self):
+    def __init__(self, clear_cache=False, purge_logs=False):
         """
         Constructor for Twicorder class. Sets up the task manager, query
         exchange, worker thread and query types.
+
+        Keyword Args:
+            clear_cache (bool): Clear application cache and exit
+            purge_logs (bool): Purge logs and exit
+
         """
+
+        # Check application mode
+        if clear_cache:
+            os.remove(Config.appdata)
+            logger.info(f'Cleared cache: {Config.appdata}')
+        if purge_logs:
+            os.remove(Config.logs)
+            logger.info(f'Purged logs: {Config.logs}')
+        if clear_cache or purge_logs:
+            sys.exit(0)
 
         # Test setup before continuing
         try:
-            from twicorder.config import Config
             from twicorder.tasks import TaskManager
             from twicorder.auth import Auth
             TaskManager.load()
@@ -33,6 +49,7 @@ class Twicorder:
             sys.exit(1)
 
         from twicorder.tasks import TaskManager
+
         self._task_manager = TaskManager()
         self._query_types = {}
         self._running = False
@@ -94,20 +111,32 @@ class Twicorder:
         from twicorder.exchange import QueryExchange
         logger.info(' Loading tasks '.center(80, '='))
         logger.info('')
-        while self._running:
-            update = False
-            for task in self.tasks:
-                if not task.due:
+        slept = 0
+        try:
+            while self._running:
+                # Sleep 1 minute, then wake up and check if any queries are due to
+                # run. Don't sleep on first run.
+                if not 0 < slept <= 60:
+                    slept = 1
+                    update = False
+                    for task in self.tasks:
+                        if not task.due:
+                            continue
+                        update = True
+                        query = self.cast_query(task)
+                        QueryExchange.add(query, callback)
+                        logger.info(query)
+                    if update:
+                        logger.info('=' * 80)
                     continue
-                update = True
-                query = self.cast_query(task)
-                QueryExchange.add(query)
-                logger.info(query)
-            if update:
-                logger.info('=' * 80)
-            # Sleep 1 minute, then wake up and check if any queries are due to
-            # run.
-            time.sleep(60)
+                # Sleep 1 second, count the number of seconds slept and continue.
+                time.sleep(1)
+                slept += 1
+        except KeyboardInterrupt:
+            logger.info('\n' + '=' * 80)
+            logger.info('Exiting...')
+            logger.info('=' * 80 + '\n')
+        QueryExchange.join_wait()
 
     def cast_query(self, task):
         """
@@ -124,8 +153,3 @@ class Twicorder:
         query_object = self.query_types[task.name]
         query = query_object(task.output, **task.kwargs)
         return query
-
-
-if __name__ == '__main__':
-    twicorder = Twicorder('~/Desktop/Twicorder')
-    twicorder.run()

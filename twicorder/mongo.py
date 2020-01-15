@@ -98,9 +98,9 @@ def backfill(path=None, db_name='twicorder', collection_name='tweets'):
     logger = TwiLogger()
     tweets = create_collection(db_name, collection_name)
 
-    save_dir = os.path.expanduser(path or Config.output_dir)
+    out_dir = os.path.expanduser(path or Config.out_dir)
 
-    paths = glob.glob(os.path.join(save_dir, '**', '*.t*'), recursive=True)
+    paths = glob.glob(os.path.join(out_dir, '**', '*.t*'), recursive=True)
     t0 = datetime.now()
     for idx, path in enumerate(paths):
         if os.path.basename(os.path.dirname(path)) != 'stream':

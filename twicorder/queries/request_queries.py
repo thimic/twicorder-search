@@ -80,15 +80,15 @@ class FollowerIDQuery(UserBaseQuery):
     def save(self):
         if not self._results or not self._output:
             return
-        save_dir = os.path.join(
-            Config.output_dir,
+        out_dir = os.path.join(
+            Config.out_dir,
             self._output or self.uid
         )
-        extension = Config.save_extension or DEFAULT_OUTPUT_EXTENSION
+        extension = Config.out_extension or DEFAULT_OUTPUT_EXTENSION
         marker = self._results[0]
         stamp = datetime.utcnow()
         filename = f'{stamp:%Y-%m-%d_%H-%M-%S}_{marker}{extension}'
-        file_path = os.path.join(save_dir, filename)
+        file_path = os.path.join(out_dir, filename)
         results_str = '\n'.join(json.dumps(r) for r in self._results)
         write(f'{results_str}\n', file_path)
         self.log(f'Wrote {len(self.results)} tweets to "{file_path}"')

@@ -143,13 +143,13 @@ class BaseQuery:
     def save(self):
         if not self._results or not self._output:
             return
-        save_dir = os.path.join(Config.output_dir,  self._output or self.uid)
-        extension = Config.save_extension or DEFAULT_OUTPUT_EXTENSION
+        out_dir = os.path.join(Config.out_dir,  self._output or self.uid)
+        extension = Config.out_extension or DEFAULT_OUTPUT_EXTENSION
         marker = self._results[0]
         stamp = datetime.strptime(marker['created_at'], TW_TIME_FORMAT)
         uid = marker['id']
         filename = f'{stamp:%Y-%m-%d_%H-%M-%S}_{uid}{extension}'
-        file_path = os.path.join(save_dir, filename)
+        file_path = os.path.join(out_dir, filename)
         results_str = '\n'.join(json.dumps(r) for r in self._results)
         write(f'{results_str}\n', file_path)
         self.log(f'Wrote {len(self.results)} tweets to "{file_path}"')
@@ -336,7 +336,8 @@ class RequestQuery(BaseQuery):
         if results:
             self.bake_ids()
             self.log(f'Cached {self.type.title()} IDs to disk!')
-            self.save()
+            # Todo: Save in callback! Don't bake IDs before successful save?
+            # self.save()
             if self.type == 'tweet' and self.last_id is None:
                 self.last_id = results[0].get('id_str')
 
@@ -393,13 +394,13 @@ class UserBaseQuery(RequestQuery):
     def save(self):
         if not self._results or not self._output:
             return
-        save_dir = os.path.join(Config.output_dir, self._output or self.uid)
-        extension = Config.save_extension or DEFAULT_OUTPUT_EXTENSION
+        out_dir = os.path.join(Config.out_dir, self._output or self.uid)
+        extension = Config.out_extension or DEFAULT_OUTPUT_EXTENSION
         marker = self._results[0]
         stamp = datetime.utcnow()
         uid = marker['id']
         filename = f'{stamp:%Y-%m-%d_%H-%M-%S}_{uid}{extension}'
-        file_path = os.path.join(save_dir, filename)
+        file_path = os.path.join(out_dir, filename)
         results_str = '\n'.join(json.dumps(r) for r in self._results)
         write(f'{results_str}\n', file_path)
         self.log(f'Wrote {len(self.results)} tweets to "{file_path}"')

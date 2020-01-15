@@ -16,7 +16,6 @@ from logging.handlers import RotatingFileHandler
 from twicorder.config import Config
 from twicorder.constants import (
     COMPRESSED_EXTENSIONS,
-    DEFAULT_APP_DATA_CONNECTION_TIMEOUT,
     REGULAR_EXTENSIONS,
     TW_TIME_FORMAT,
 )
@@ -67,15 +66,12 @@ class AppData:
     Class for reading and writing AppData to be used between sessions.
     """
 
-    _timeout = (
-        Config.appdata_connection_timeout or DEFAULT_APP_DATA_CONNECTION_TIMEOUT
-    )
     if not os.path.exists(Config.appdata_dir):
         os.makedirs(Config.appdata_dir)
     _con = sqlite3.connect(
         Config.appdata,
         check_same_thread=False,
-        timeout=float(_timeout)
+        timeout=float(Config.appdata_timeout)
     )
     _lock = Lock()
 

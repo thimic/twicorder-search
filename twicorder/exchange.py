@@ -19,10 +19,16 @@ class QueryWorker(Thread):
     def __init__(self, *args, **kwargs):
         super(QueryWorker, self).__init__(*args, **kwargs)
         self._query = None
+        self._running = True
 
     def setup(self, queue, on_result=None):
         self._queue = queue
         self._on_result = on_result
+
+    def cancel(self):
+        self._running = False
+        self.join()
+        logger.debug(f'Terminated thread "{self.name}" after call to cancel.')
 
     @property
     def queue(self):
@@ -36,12 +42,14 @@ class QueryWorker(Thread):
         """
         Fetches query from queue and executes it.
         """
-        while True:
+        while self._running:
             self._query = self.queue.get()
             if self.query is None:
-                logger.info(f'Terminating thread "{self.name}"')
+                logger.debug(
+                    f'Terminated thread "{self.name}" after tombstone query.'
+                )
                 break
-            while not self.query.done:
+            while not self.query.done and self._running:
                 try:
                     self.query.run()
                 except Exception:
@@ -65,13 +73,14 @@ class QueryExchange:
     failure = False
 
     @classmethod
-    def get_queue(cls, endpoint):
+    def get_queue(cls, endpoint, callback=None):
         """
         Retrieves the queue for the given endpoint if it exists, otherwise
         creates a queue.
 
         Args:
             endpoint (str): API endpoint
+            callback (func): Callback function that handles query results
 
         Returns:
             Queue: Queue for endpoint
@@ -81,26 +90,22 @@ class QueryExchange:
             queue = Queue()
             cls.queues[endpoint] = queue
             thread = QueryWorker(name=endpoint)
-            thread.setup(queue=queue, on_result=cls.on_result)
+            thread.setup(queue=queue, on_result=callback)
             thread.start()
             cls.threads[endpoint] = thread
         return cls.queues[endpoint]
 
-    @staticmethod
-    def on_result(query):
-        # Todo: Perform query action, such as save!
-        print(f'Received result from {query}')
-
     @classmethod
-    def add(cls, query):
+    def add(cls, query, callback=None):
         """
         Finds appropriate queue for given end point and adds it.
 
         Args:
             query (BaseQuery): Query object
+            callback (func): Callback function that handles query results
 
         """
-        queue = cls.get_queue(query.endpoint)
+        queue = cls.get_queue(query.endpoint, callback)
         if query in queue.queue:
             logger.info(f'Query with ID {query.uid} is already in the queue.')
             return
@@ -120,12 +125,15 @@ class QueryExchange:
         cls.failure = False
 
     @classmethod
-    def wait(cls):
+    def join_wait(cls):
         """
         Sends shutdown signal to threads and waits for all threads and queues to
         terminate.
         """
+        # Add tombstone to queues to cancel empty, blocking queues.
         for queue in cls.queues.values():
-            queue.put_nowait(None)
+            queue.put(None)
+
+        # Stop threads in progress
         for thread in cls.threads.values():
-            thread.join()
+            thread.cancel()
