@@ -17,6 +17,7 @@ class Task:
     def __init__(self, name, frequency=15, output=None, **kwargs):
         self._name = name
         self._frequency = frequency
+        self._repeating = frequency == 0
         self._output = output
         self._kwargs = kwargs
 
@@ -45,6 +46,18 @@ class Task:
         return self._frequency
 
     @property
+    def repeating(self):
+        """
+        Describes if the task should be repeated at the frequency interval or
+        only be run  once.
+
+        Returns:
+            bool: True if repeating, False if only executing once
+
+        """
+        return self._repeating
+
+    @property
     def output(self):
         return self._output
 
@@ -57,6 +70,8 @@ class Task:
         if self._last_run is None:
             self._last_run = time.time()
             return True
+        if self.frequency == 0:
+            return False
         if time.time() - self._last_run >= self.frequency * 60:
             self._last_run = time.time()
             return True

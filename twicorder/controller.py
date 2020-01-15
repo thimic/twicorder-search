@@ -119,8 +119,17 @@ class Twicorder:
                 if not 0 < slept <= 60:
                     slept = 1
                     update = False
+
+                    # Remove completed one time tasks from previous run
+                    tasks_done = []
+                    for task in tasks_done:
+                        self.tasks.remove(task)
+
                     for task in self.tasks:
                         if not task.due:
+                            if not task.repeating:
+                                # Flag completed one time tasks as done
+                                tasks_done.append(task)
                             continue
                         update = True
                         query = self.cast_query(task)
