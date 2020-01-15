@@ -14,10 +14,11 @@ logger = TwiLogger()
 
 class Task:
 
-    def __init__(self, name, frequency=15, output=None, **kwargs):
+    def __init__(self, name, frequency=15, iterations=0, output=None, **kwargs):
         self._name = name
         self._frequency = frequency
-        self._repeating = frequency == 0
+        self._iterations = iterations
+        self._remaining = iterations
         self._output = output
         self._kwargs = kwargs
 
@@ -31,6 +32,7 @@ class Task:
             f'Task('
             f'name={repr(self.name)}, '
             f'frequency={repr(self.frequency)}, '
+            f'iterations={repr(self.iterations)}, '
             f'multipart={self.multipart}, '
             f'kwargs={str(self.kwargs)}'
             f')'
@@ -38,44 +40,109 @@ class Task:
         return string
 
     @property
-    def name(self):
+    def name(self) -> str:
+        """
+        Task name.
+
+        Returns:
+            str: Task name
+
+        """
         return self._name
 
     @property
-    def frequency(self):
+    def frequency(self) -> int:
+        """
+        Frequency with which to repeat the task in minutes.
+
+        Returns:
+            int: Task repeat frequency
+
+        """
         return self._frequency
 
     @property
-    def repeating(self):
+    def iterations(self) -> int:
         """
-        Describes if the task should be repeated at the frequency interval or
-        only be run  once.
+        Number of times to iterate over the task. A value of 0 will iterate
+        indefinitely.
 
         Returns:
-            bool: True if repeating, False if only executing once
+            int: Number of iterations
 
         """
-        return self._repeating
+        return self._iterations
 
     @property
-    def output(self):
+    def remaining(self) -> int:
+        """
+        Number of iterations remaining for this task.
+
+        Returns:
+            int: Number of remaining iterations
+
+        """
+        return self._remaining
+
+    @property
+    def output(self) -> str:
+        """
+        Task result output path, relative to output directory.
+
+        Returns:
+            str: Task result output relative path
+
+        """
         return self._output
 
     @property
-    def kwargs(self):
+    def kwargs(self) -> dict:
+        """
+        Additional keyword arguments for the task.
+
+        Returns:
+            dict: Additional keyword arguments
+
+        """
         return self._kwargs
 
     @property
-    def due(self):
+    def due(self) -> bool:
+        """
+        Checks if task is due to be run, based on given number of iterations and
+        frequency.
+
+        Returns:
+            bool: True if task is due to run, else False
+
+        """
         if self._last_run is None:
             self._last_run = time.time()
             return True
-        if self.frequency == 0:
-            return False
         if time.time() - self._last_run >= self.frequency * 60:
             self._last_run = time.time()
             return True
         return False
+
+    @property
+    def done(self) -> bool:
+        """
+        The task is done when there are no more iterations remaining.
+
+        Returns:
+            bool: True if all task iterations are done, else False
+
+        """
+        return self._iterations != 0 and self._remaining == 0
+
+    def checkout(self):
+        """
+        Decrements remaining iterations with one for tasks with a finite number
+        of iterations.
+        """
+        if self._iterations > 0 and self._remaining > 0:
+            self._remaining -= 1
+
 
 
 class TaskManager:

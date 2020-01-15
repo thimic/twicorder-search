@@ -127,14 +127,11 @@ class Twicorder:
 
                     for task in self.tasks:
                         if not task.due:
-                            if not task.repeating:
-                                # Flag completed one time tasks as done
-                                tasks_done.append(task)
                             continue
                         update = True
                         query = self.cast_query(task)
                         # Todo: Finish callback logic!
-                        QueryExchange.add(query, callback)
+                        QueryExchange.add(query, save)
                         logger.info(query)
                     if update:
                         logger.info('=' * 80)
@@ -162,4 +159,9 @@ class Twicorder:
         """
         query_object = self.query_types[task.name]
         query = query_object(task.output, **task.kwargs)
+        task.checkout()
         return query
+
+
+def save(query):
+    query.save()
