@@ -124,6 +124,7 @@ class Twicorder:
                             continue
                         update = True
                         query = self.cast_query(task)
+                        # Todo: Finish callback logic!
                         QueryExchange.add(query, callback)
                         logger.info(query)
                     if update:
