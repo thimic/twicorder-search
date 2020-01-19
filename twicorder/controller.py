@@ -8,7 +8,8 @@ import time
 
 from twicorder import TwicorderException
 from twicorder.config import Config
-from twicorder.utils import TwiLogger
+from twicorder.logging import TwiLogger
+from twicorder.tasks import TaskManager
 
 logger = TwiLogger()
 
@@ -40,15 +41,11 @@ class Twicorder:
 
         # Test setup before continuing
         try:
-            from twicorder.tasks import TaskManager
             from twicorder.auth import Auth
-            TaskManager.load()
             Auth.session()
         except TwicorderException as error:
             logger.critical(error)
             sys.exit(1)
-
-        from twicorder.tasks import TaskManager
 
         self._task_manager = TaskManager()
         self._query_types = {}
@@ -113,17 +110,12 @@ class Twicorder:
         logger.info('')
         slept = 0
         try:
-            while self._running:
-                # Sleep 1 minute, then wake up and check if any queries are due to
-                # run. Don't sleep on first run.
+            while self._running and (self.tasks or QueryExchange.active()):
+                # Check if any queries are due to run every 60 seconds. Don't
+                # wait on first run.
                 if not 0 < slept <= 60:
                     slept = 1
                     update = False
-
-                    # Remove completed one time tasks from previous run
-                    tasks_done = []
-                    for task in tasks_done:
-                        self.tasks.remove(task)
 
                     for task in self.tasks:
                         if not task.due:
@@ -131,7 +123,7 @@ class Twicorder:
                         update = True
                         query = self.cast_query(task)
                         # Todo: Finish callback logic!
-                        QueryExchange.add(query, save)
+                        QueryExchange.add(query, self.on_query_result)
                         logger.info(query)
                     if update:
                         logger.info('=' * 80)
@@ -142,6 +134,10 @@ class Twicorder:
         except KeyboardInterrupt:
             logger.info('\n' + '=' * 80)
             logger.info('Exiting...')
+            logger.info('=' * 80 + '\n')
+        if not self.tasks:
+            logger.info('\n' + '=' * 80)
+            logger.info('No more tasks to execute. Exiting...')
             logger.info('=' * 80 + '\n')
         QueryExchange.join_wait()
 
@@ -162,6 +158,14 @@ class Twicorder:
         task.checkout()
         return query
 
+    @staticmethod
+    def on_query_result(query):
+        """
+        Slot that gets called when a result is ready for the given query.
 
-def save(query):
-    query.save()
+        Args:
+            query (BaseQuery): Query object
+
+        """
+        query.save()
+

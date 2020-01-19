@@ -6,7 +6,7 @@ import time
 from queue import Queue
 from threading import Thread
 
-from twicorder.utils import TwiLogger
+from twicorder.logging import TwiLogger
 
 logger = TwiLogger()
 
@@ -59,8 +59,9 @@ class QueryWorker(Thread):
                     self._on_result(self.query)
                 logger.info(self.query.fetch_log())
                 time.sleep(.2)
-            time.sleep(.5)
+            self._query = None
             self.queue.task_done()
+            time.sleep(.5)
 
 
 class QueryExchange:
@@ -114,6 +115,17 @@ class QueryExchange:
             logger.info(f'Query with ID {query.uid} is already running.')
             return
         queue.put(query)
+
+    @classmethod
+    def active(cls) -> bool:
+        """
+        Whether any threads in the QueryExchange are active.
+
+        Returns:
+            bool: True if any threads are active, else False
+
+        """
+        return any(t.is_alive() for t in cls.threads.values())
 
     @classmethod
     def clear(cls):

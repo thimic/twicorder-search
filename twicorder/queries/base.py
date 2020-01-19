@@ -13,6 +13,7 @@ import yaml
 
 from datetime import datetime, timedelta
 
+from twicorder.appdata import AppData
 from twicorder.auth import Auth
 from twicorder.config import Config
 from twicorder.constants import (
@@ -21,7 +22,7 @@ from twicorder.constants import (
     TW_TIME_FORMAT
 )
 from twicorder.rate_limits import RateLimitCentral
-from twicorder.utils import write, AppData, timestamp_to_datetime
+from twicorder.utils import write, timestamp_to_datetime
 
 
 class BaseQuery:

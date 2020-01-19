@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from __future__ import annotations
+
 import os
 import time
 import yaml
 
-from twicorder import NoTasksException
-from twicorder.config import Config
-from twicorder.utils import TwiLogger
+from typing import List
 
-logger = TwiLogger()
+from twicorder import NoTasksException
+from twicorder.constants import (
+    DEFAULT_TASK_FREQUENCY,
+    DEFAULT_TASK_ITERATIONS,
+    DEFAULT_TASK_KWARGS,
+)
 
 
 class Task:
@@ -30,10 +35,10 @@ class Task:
     def __repr__(self):
         string = (
             f'Task('
-            f'name={repr(self.name)}, '
-            f'frequency={repr(self.frequency)}, '
-            f'iterations={repr(self.iterations)}, '
-            f'multipart={self.multipart}, '
+            f'name={self.name!r}, '
+            f'frequency={self.frequency}, '
+            f'iterations={self.iterations}, '
+            f'output={self.output!r}, '
             f'kwargs={str(self.kwargs)}'
             f')'
         )
@@ -117,12 +122,8 @@ class Task:
 
         """
         if self._last_run is None:
-            self._last_run = time.time()
             return True
-        if time.time() - self._last_run >= self.frequency * 60:
-            self._last_run = time.time()
-            return True
-        return False
+        return time.time() - self._last_run >= self.frequency * 60
 
     @property
     def done(self) -> bool:
@@ -135,42 +136,54 @@ class Task:
         """
         return self._iterations != 0 and self._remaining == 0
 
-    def checkout(self):
+    def checkout(self) -> Task:
         """
         Decrements remaining iterations with one for tasks with a finite number
         of iterations.
+
+        Returns:
+            Task: This task
+
         """
+        self._last_run = time.time()
         if self._iterations > 0 and self._remaining > 0:
             self._remaining -= 1
-
+        return self
 
 
 class TaskManager:
 
-    _tasks = []
-
-    @classmethod
-    def load(cls):
+    def __init__(self):
         """
         Reading tasks from yaml file and parsing to a dictionary.
         """
-        cls._tasks = []
+        from twicorder.config import Config
+        self._tasks = []
         if not os.path.isfile(Config.task_file):
             raise NoTasksException
         with open(Config.task_file, 'r') as stream:
             raw_tasks = yaml.full_load(stream)
         for query, tasks in raw_tasks.items():
             for raw_task in tasks or []:
+                frequency = raw_task.get('frequency') or DEFAULT_TASK_FREQUENCY
+                iters = raw_task.get('iterations') or DEFAULT_TASK_ITERATIONS
                 task = Task(
                     name=query,
-                    frequency=raw_task.get('frequency') or 15,
-                    output=raw_task.get('output'),
-                    **raw_task.get('kwargs') or {}
+                    frequency=frequency,
+                    iterations=iters,
+                    output=raw_task.get('output') or query,
+                    **raw_task.get('kwargs') or DEFAULT_TASK_KWARGS
                 )
-                cls._tasks.append(task)
+                self._tasks.append(task)
 
     @property
-    def tasks(self):
-        if not self._tasks:
-            self.load()
+    def tasks(self) -> List[Task]:
+        """
+        List of available tasks that are not finished.
+
+        Returns:
+            list[Task]: List of remaining tasks
+
+        """
+        self._tasks = [t for t in self._tasks if not t.done]
         return self._tasks

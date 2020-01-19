@@ -7,14 +7,32 @@ import urllib
 
 from datetime import datetime, timedelta
 
+from twicorder.appdata import AppData
 from twicorder.cached_users import CachedUserCentral
 from twicorder.config import Config
 from twicorder.constants import DEFAULT_EXPAND_USERS, DEFAULT_OUTPUT_EXTENSION
 from twicorder.queries import RequestQuery, UserBaseQuery
-from twicorder.utils import AppData, write
+from twicorder.utils import write
 
 
 class UserLookupQuery(UserBaseQuery):
+    """
+    Example for tasks.yaml:
+
+    user_lookups:                          # Endpoint name
+      - frequency: 60                      # Interval between repeating queries in minutes
+        iterations: 1                      # Number of times to repeat the query, 0 means indefinitely
+        output: twitter/followers/users    # Output directory, relative to project directory
+        kwargs:                            # Keyword Arguments to feed to endpoint
+          user_id: 783214,6253282          # Comma separated list of user IDs, max 100
+          include_entities: false          # Include entities node with statuses
+      - frequency: 60                      # Interval between repeating queries in minutes
+        iterations: 1                      # Number of times to repeat the query, 0 means indefinitely
+        output: twitter/followers/users    # Output directory, relative to project directory
+        kwargs:
+          screen_name: twitterapi,twitter  # Comma separated list of screen names, max 100
+
+    """
 
     name = 'user_lookups'
     endpoint = '/users/lookup'
@@ -27,6 +45,23 @@ class UserLookupQuery(UserBaseQuery):
 
 
 class FollowerIDQuery(UserBaseQuery):
+    """
+    Example for tasks.yaml:
+
+    follower_ids:                      # Endpoint name
+      - frequency: 60                  # Interval between repeating queries in minutes
+        iterations: 1                  # Number of times to repeat the query, 0 means indefinitely
+        output: noradio/followers/ids  # Output directory, relative to project directory
+        kwargs:                        # Keyword Arguments to feed to endpoint
+          user_id: 783214              # User ID to get follower IDs for
+      - frequency: 60                  # Interval between repeating queries in minutes
+        iterations: 1                  # Number of times to repeat the query, 0 means indefinitely
+        output: noradio/followers/ids  # Output directory, relative to project directory
+        kwargs:
+          screen_name: noradio         # Screen name to get follower IDs for
+          count: 200                   # Number of follower IDs to look up per request
+
+    """
 
     name = 'follower_ids'
     endpoint = '/followers/ids'
@@ -80,10 +115,7 @@ class FollowerIDQuery(UserBaseQuery):
     def save(self):
         if not self._results or not self._output:
             return
-        out_dir = os.path.join(
-            Config.out_dir,
-            self._output or self.uid
-        )
+        out_dir = os.path.join(Config.out_dir, self._output or self.uid)
         extension = Config.out_extension or DEFAULT_OUTPUT_EXTENSION
         marker = self._results[0]
         stamp = datetime.utcnow()
@@ -114,6 +146,22 @@ class StatusQuery(RequestQuery):
 
 
 class TimelineQuery(RequestQuery):
+    """
+    Example for tasks.yaml:
+
+    user_timeline:                 # Endpoint name
+      - frequency: 15              # Interval between repeating queries in minutes
+        iterations: 1              # Number of times to repeat the query, 0 means indefinitely
+        output: "github/timeline"  # Output directory, relative to project directory
+        kwargs:                    # Keyword Arguments to feed to endpoint
+          screen_name: "github"    # Screen name to look up timeline for
+      - frequency: 15
+        iterations: 0
+        output: "github/timeline"
+        kwargs:
+          screen_name: "nasa"
+
+    """
 
     name = 'user_timeline'
     endpoint = '/statuses/user_timeline'

@@ -14,7 +14,7 @@ from pymongo.errors import ServerSelectionTimeoutError
 
 from twicorder import utils
 from twicorder.config import Config
-from twicorder.utils import TwiLogger
+from twicorder.logging import TwiLogger
 
 logger = TwiLogger()
 
