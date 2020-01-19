@@ -297,6 +297,12 @@ class RequestQuery(BaseQuery):
             if response.status_code == 429:
                 self.log(f'Rate Limit in effect: {response.reason}')
                 self.log(f'Message: {response.json().get("message")}')
+                RateLimitCentral.insert(
+                    endpoint=self.endpoint,
+                    cap=0,
+                    remaining=0,
+                    reset=datetime.now().timestamp() + 60
+                )
             else:
                 self.log(
                     '<{r.status_code}> {r.reason}: {r.content}'

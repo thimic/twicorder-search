@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from __future__ import annotations
+
 from datetime import datetime
 
 
@@ -28,6 +30,20 @@ class RateLimitCentral:
         if not limit_keys.issubset(header.keys()):
             return
         cls._limits[endpoint] = RateLimit(header)
+
+    @classmethod
+    def insert(cls, endpoint: str, cap: int, remaining: int, reset: float):
+        """
+        Create rate limit object from values, rather than headers.
+
+        Args:
+            endpoint (str): Endpoint
+            cap (int): Query cap for the given endpoint
+            remaining (int): Remaining queries for the given endpoint
+            reset (float): Time until the current 15 minute window expires
+
+        """
+        cls._limits[endpoint] = RateLimit.create(cap, remaining, reset)
 
     @classmethod
     def get(cls, endpoint):
@@ -102,6 +118,27 @@ class RateLimit:
         self._cap = headers.get('x-rate-limit-limit')
         self._remaining = int(headers.get('x-rate-limit-remaining'))
         self._reset = float(headers.get('x-rate-limit-reset'))
+
+    @classmethod
+    def create(cls, cap: int, remaining: int, reset: float) -> RateLimit:
+        """
+        Create rate limit object from values, rather than headers.
+
+        Args:
+            cap (int): Query cap for the given endpoint
+            remaining (int): Remaining queries for the given endpoint
+            reset (float): Time until the current 15 minute window expires
+
+        Returns:
+            RateLimit: Rate limit object
+
+        """
+        headers = {
+            'x-rate-limit-limit': cap,
+            'x-rate-limit-remaining': remaining,
+            'x-rate-limit-reset': reset
+        }
+        return RateLimit(headers)
 
     def __repr__(self):
         reset = datetime.fromtimestamp(self._reset)
