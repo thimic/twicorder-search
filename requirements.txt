@@ -1,5 +1,6 @@
 
 click>=6.0
+oauth2>=1.9
 pymongo>=3.8.0
 PyYAML>=5.1
 requests>=2.20.1

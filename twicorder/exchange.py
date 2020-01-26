@@ -51,7 +51,7 @@ class QueryWorker(Thread):
                 break
             while not self.query.done and self._running:
                 try:
-                    self.query.run()
+                    self.query.start()
                 except Exception:
                     logger.exception('Query failed:\n')
                     break

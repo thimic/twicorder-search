@@ -32,18 +32,30 @@ class RateLimitCentral:
         cls._limits[endpoint] = RateLimit(header)
 
     @classmethod
-    def insert(cls, endpoint: str, cap: int, remaining: int, reset: float):
+    def insert(cls, endpoint: str, limit: int, remaining: int, reset: float):
         """
         Create rate limit object from values, rather than headers.
 
         Args:
             endpoint (str): Endpoint
-            cap (int): Query cap for the given endpoint
+            limit (int): Query cap for the given endpoint
             remaining (int): Remaining queries for the given endpoint
             reset (float): Time until the current 15 minute window expires
 
         """
-        cls._limits[endpoint] = RateLimit.create(cap, remaining, reset)
+        cls._limits[endpoint] = RateLimit.create(limit, remaining, reset)
+
+    @classmethod
+    def _load_rate_limits(cls):
+        """
+        Load all rate limits.
+        """
+        from twicorder.queries.request_queries import RateLimitStatusQuery
+        query = RateLimitStatusQuery()
+        results = query.start()
+        for resource, family in results['resources'].items():
+            for endpoint, limit_data in family.items():
+                cls.insert(endpoint=endpoint, **limit_data)
 
     @classmethod
     def get(cls, endpoint):
@@ -56,12 +68,14 @@ class RateLimitCentral:
             RateLimit: Rate limit object
 
         """
+        if not cls._limits.get(endpoint):
+            cls._load_rate_limits()
         return cls._limits.get(endpoint)
 
     @classmethod
     def get_cap(cls, endpoint):
         """
-        Retrieve the query cap for the given endpoint.
+        Retrieve the query limit for the given endpoint.
 
         Args:
             endpoint (str): Endpoint
@@ -125,7 +139,7 @@ class RateLimit:
         Create rate limit object from values, rather than headers.
 
         Args:
-            cap (int): Query cap for the given endpoint
+            cap (int): Query limit for the given endpoint
             remaining (int): Remaining queries for the given endpoint
             reset (float): Time until the current 15 minute window expires
 
@@ -143,7 +157,7 @@ class RateLimit:
     def __repr__(self):
         reset = datetime.fromtimestamp(self._reset)
         representation = (
-            f'RateLimit(cap={self.cap}, remaining={self.remaining}, '
+            f'RateLimit(limit={self.cap}, remaining={self.remaining}, '
             f'reset="{reset:%y.%m.%d %H:%M:%S}")'
         )
         return representation

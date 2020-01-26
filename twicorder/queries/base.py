@@ -5,7 +5,6 @@ import copy
 import hashlib
 import json
 import os
-import requests
 import time
 import traceback
 import urllib
@@ -14,10 +13,9 @@ import yaml
 from datetime import datetime, timedelta
 
 from twicorder.appdata import AppData
-from twicorder.auth import Auth
+from twicorder.auth import AuthHandler
 from twicorder.config import Config
 from twicorder.constants import (
-    DEFAULT_MONGO_OUTPUT,
     DEFAULT_OUTPUT_EXTENSION,
     TW_TIME_FORMAT
 )
@@ -38,6 +36,7 @@ class BaseQuery:
     _type = 'tweet'
 
     _mongo_collection = None
+    _mongo_support = False
 
     def __init__(self, output=None, **kwargs):
         self._done = False
@@ -121,7 +120,7 @@ class BaseQuery:
 
     @property
     def mongo_collection(self):
-        if not Config.use_mongo or DEFAULT_MONGO_OUTPUT:
+        if not self.mongo_support or not Config.use_mongo:
             return
         from twicorder import mongo
         collection = self._mongo_collection
@@ -129,8 +128,57 @@ class BaseQuery:
             self._mongo_collection = mongo.create_collection()
         return self._mongo_collection
 
+    @property
+    def mongo_support(self) -> bool:
+        """
+        Whether this query supports pushing its results to MongoDB.
+
+        Returns:
+            bool: True if query supports MongoDB, else False
+
+        """
+        return self._mongo_support
+
+    def setup(self):
+        pass
+
     def run(self):
         raise NotImplementedError
+
+    def finalise(self, response):
+        pass
+
+    def start(self):
+        self.setup()
+        response = self.run()
+        self.finalise(response)
+        return self.results
+
+    def result_timestamp(self, result) -> datetime:
+        """
+        For a given result produced by the current query, return its time stamp.
+
+        Args:
+            result (dict): One single result object
+
+        Returns:
+            datetime.datetime: Timestamp
+
+        """
+        return datetime.utcnow()
+
+    def result_id(self, result: object) -> str:
+        """
+        For a given result produced by the current query, return its ID.
+
+        Args:
+            result (object): One single result object
+
+        Returns:
+            str: Timestamp
+
+        """
+        return f'{id(self):x}'
 
     def log(self, line):
         self._log.append(line)
@@ -142,20 +190,26 @@ class BaseQuery:
         return log_data
 
     def save(self):
+        """
+        Save the results of the query to disk.
+        """
         if not self._results or not self._output:
             return
         out_dir = os.path.join(Config.out_dir,  self._output or self.uid)
         extension = Config.out_extension or DEFAULT_OUTPUT_EXTENSION
         marker = self._results[0]
-        stamp = datetime.strptime(marker['created_at'], TW_TIME_FORMAT)
-        uid = marker['id']
+        stamp = self.result_timestamp(marker)
+        uid = self.result_id(marker)
         filename = f'{stamp:%Y-%m-%d_%H-%M-%S}_{uid}{extension}'
         file_path = os.path.join(out_dir, filename)
         results_str = '\n'.join(json.dumps(r) for r in self._results)
         write(f'{results_str}\n', file_path)
-        self.log(f'Wrote {len(self.results)} tweets to "{file_path}"')
+        self.log(f'Wrote {len(self.results)} results to "{file_path}"')
 
-        # Write to Mongo
+    def push_to_mongodb(self):
+        """
+        Push results from query to MongoDB.
+        """
         if not self.mongo_collection:
             return
         try:
@@ -174,44 +228,42 @@ class BaseQuery:
 
     def bake_ids(self):
         """
-        Saves a cache of tweet IDs from query result to disk. In storing the IDs
-        between sessions, we make sure we don't save already found tweets.
+        Saves a cache of result IDs from query result to disk. In storing the
+        IDs between sessions we make sure we don't save already found data.
 
-        To prevent the disk cache growing too large, we purge IDs for tweets
+        To prevent the disk cache growing too large, we purge IDs for results
         older than 14 days. Twitter's base search only goes back 7 days, so we
-        shouldn't encounter tweets older than 14 days very often.
+        shouldn't encounter results older than 14 days very often.
         """
 
         # Loading picked tweet IDs
-        tweets = dict(AppData.get_query_tweets(self.name)) or {}
+        results = dict(AppData.get_query_objects(self.name)) or {}
 
         # Purging tweet IDs older than 14 days
         now = datetime.now()
-        old_tweets = tweets.copy()
-        tweets = {}
-        for tweet_id, timestamp in old_tweets.items():
+        old_results = results.copy()
+        results = {}
+        for object_id, timestamp in old_results.items():
             dt = datetime.fromtimestamp(timestamp)
             if not now - dt > timedelta(days=14):
-                tweets[tweet_id] = timestamp
+                results[object_id] = timestamp
 
         # Stores tweet IDs from result
-        self._results = [t for t in self.results if t['id'] not in tweets]
-        new_tweets = []
+        self._results = [r for r in self.results if r['id'] not in results]
+        new_results = []
         for result in self.results:
-            created_at = result['created_at']
-            dt = datetime.strptime(created_at, TW_TIME_FORMAT)
-            timestamp = int(dt.timestamp())
-            new_tweets.append((result['id'], timestamp))
-        AppData.add_query_tweets(self.name, new_tweets)
+            timestamp = self.result_timestamp(result)
+            new_results.append((result['id'], int(timestamp.timestamp())))
+        AppData.add_query_objects(self.name, new_results)
 
 
-class RequestQuery(BaseQuery):
+class BaseRequestQuery(BaseQuery):
     """
     Queries based on the requests module and the twitter API.
     """
     _base_url = 'https://api.twitter.com/1.1'
     _request_type = 'get'
-    _token_auth = False
+    _user_auth = False
 
     _hash_keys = [
         'endpoint',
@@ -222,7 +274,7 @@ class RequestQuery(BaseQuery):
     ]
 
     def __init__(self, output=None, **kwargs):
-        super(RequestQuery, self).__init__(output, **kwargs)
+        super().__init__(output, **kwargs)
 
     def __eq__(self, other):
         return type(self) == type(other) and self.uid == other.uid
@@ -236,8 +288,8 @@ class RequestQuery(BaseQuery):
         return self._request_type
 
     @property
-    def token_auth(self):
-        return self._token_auth
+    def user_auth(self):
+        return self._user_auth
 
     @property
     def request_url(self):
@@ -252,38 +304,29 @@ class RequestQuery(BaseQuery):
         hash_str = str([getattr(self, k) for k in self._hash_keys]).encode()
         return hashlib.blake2s(hash_str).hexdigest()
 
-    def run(self):
+    def setup(self):
         # Purging logs
         self._log = []
 
-        # Check rate limit for query. Sleep if limits are in effect.
-        limit = RateLimitCentral.get(self.endpoint)
+    def run(self):
+
         self.log(f'URL: {self.request_url}')
-        self.log(f'{limit}')
-        if limit and limit.remaining == 0:
-            sleep_time = max(limit.reset - time.time(), 0) + 2
-            msg = (
-                f'Sleeping for {sleep_time:.02f} seconds for endpoint '
-                f'"{self.endpoint}".'
-            )
-            self.log(msg)
-            time.sleep(sleep_time)
 
         # Perform query
         attempts = 0
         while True:
             try:
-                if self._token_auth:
-                    request = getattr(requests, self.request_type)
-                    response = request(
-                        self.request_url,
-                        data=json.dumps(self.kwargs),
-                        auth=Auth.token()
+                if self.user_auth:
+                    response = AuthHandler.user_request(
+                        uri=self.request_url,
+                        method=self.request_type
                     )
                 else:
-                    request = getattr(Auth.session(), self.request_type)
-                    response = request(self.request_url)
-            except Exception:
+                    response = AuthHandler.app_request(
+                        uri=self.request_url,
+                        method=self.request_type
+                    )
+            except Exception as e:
                 attempts += 1
                 time.sleep(2**attempts)
                 if attempts >= 5:
@@ -293,13 +336,13 @@ class RequestQuery(BaseQuery):
 
         # Check query response code. Return with error message if not a
         # successful 200 code.
-        if response.status_code != 200:
-            if response.status_code == 429:
+        if response.status != 200:
+            if response.status == 429:
                 self.log(f'Rate Limit in effect: {response.reason}')
-                self.log(f'Message: {response.json().get("message")}')
+                self.log(f'Message: {response.data.get("message")}')
                 RateLimitCentral.insert(
                     endpoint=self.endpoint,
-                    cap=0,
+                    limit=0,
                     remaining=0,
                     reset=datetime.now().timestamp() + 60
                 )
@@ -308,15 +351,12 @@ class RequestQuery(BaseQuery):
                     '<{r.status_code}> {r.reason}: {r.content}'
                     .format(r=response)
                 )
-            return
+            return response
         self.log('Successful return!')
-
-        # Update rate limit for query
-        RateLimitCentral.update(self.endpoint, response.headers)
 
         # Search query response for additional paged results. Pronounce the
         # query done if no more pages are found.
-        pagination = response.json()
+        pagination = response.data
         if self.fetch_more_path:
             for token in self.fetch_more_path.split('.'):
                 pagination = pagination.get(token, {})
@@ -331,83 +371,90 @@ class RequestQuery(BaseQuery):
             self._done = True
 
         # Extract crawled tweets from query response.
-        results = response.json()
+        results = response.data
         if self.results_path:
             for token in self.results_path.split('.'):
                 results = results.get(token, [])
         self._results = results
         self.log(f'Result count: {len(results)}')
 
-        # Saves and stores IDs for crawled tweets found in the query result.
-        # Also records the last tweet ID found.
-        if results:
-            self.bake_ids()
-            self.log(f'Cached {self.type.title()} IDs to disk!')
+        # Returning crawled results
+        return response
+
+
+class ProductionRequestQuery(BaseRequestQuery):
+
+    def setup(self):
+        super().setup()
+        # Check rate limit for query. Sleep if limits are in effect.
+        limit = RateLimitCentral.get(self.endpoint)
+        self.log(f'{limit}')
+        if limit and limit.remaining == 0:
+            sleep_time = max(limit.reset - time.time(), 0) + 2
+            msg = (
+                f'Sleeping for {sleep_time:.02f} seconds for endpoint '
+                f'"{self.endpoint}".'
+            )
+            self.log(msg)
+            time.sleep(sleep_time)
+
+    def finalise(self, response):
+        super().finalise(response)
+
+        # Update rate limit for query
+        RateLimitCentral.update(self.endpoint, response.headers)
+
+        # Save and store IDs for crawled tweets found in the query result.
+        # Also record the last tweet ID found.
+        if self.results:
             # Todo: Save in callback! Don't bake IDs before successful save?
             # self.save()
-            if self.type == 'tweet' and self.last_id is None:
-                self.last_id = results[0].get('id_str')
+            pass
 
-        # Caches last tweet ID found to disk if the query, including all pages
+
+class TweetRequestQuery(ProductionRequestQuery):
+
+    _mongo_support = True
+
+    def result_timestamp(self, result):
+        """
+        For a given result produced by the current query, return its time stamp.
+
+        Args:
+            result (dict): One single result object
+
+        Returns:
+            datetime.datetime): Timestamp
+
+        """
+        created_at = result['created_at']
+        return datetime.strptime(created_at, TW_TIME_FORMAT)
+
+    def result_id(self, result: object) -> str:
+        """
+        For a given result produced by the current query, return its ID.
+
+        Args:
+            result (object): One single result object
+
+        Returns:
+            str: Timestamp
+
+        """
+        return str(result['id'])
+
+    def finalise(self, response):
+        super().finalise(response)
+        self.bake_ids()
+        self.log(f'Cached {self.type.title()} IDs to disk!')
+        if self.results:
+            if self.type == 'tweet' and self.last_id is None:
+                self.last_id = self.results[0].get('id_str')
+
+        # Cache last tweet ID found to disk if the query, including all pages
         # completed successfully. This saves us from searching all the way back
         # to the beginning on next crawl. Instead we can stop when we encounter
         # this tweet.
         if self._done and self.last_id:
             self.log(f'Cached ID of last tweet returned by query to disk.')
             AppData.set_last_query_id(self.uid, self.last_id)
-
-        # Returning crawled results
-        return results
-
-
-class UserBaseQuery(RequestQuery):
-
-    _type = 'user'
-
-    def __init__(self, output=None, **kwargs):
-        super(UserBaseQuery, self).__init__(output, **kwargs)
-        self._kwargs.update(kwargs)
-
-    def bake_ids(self):
-        """
-        Saves a cache of user IDs from query result to disk. In storing the IDs
-        between sessions, we ensure crawled data is not lost between sessions.
-
-        To prevent the disk cache growing too large, we purge IDs for users
-        crawled more than 14 days ago.
-        """
-
-        # Loading picked tweet IDs
-        users = dict(AppData.get_user_ids(self.name)) or {}
-
-        # Purging tweet IDs older than 14 days
-        now = datetime.now()
-        old_users = users.copy()
-        users = {}
-        for user_id, timestamp in old_users.items():
-            dt = datetime.fromtimestamp(timestamp)
-            if not now - dt > timedelta(days=14):
-                users[user_id] = timestamp
-
-        # Stores tweet IDs from result
-        self._results = [u for u in self.results if u['id'] not in users]
-        new_users = []
-        for result in self.results:
-            dt = datetime.utcnow()
-            timestamp = int(dt.timestamp())
-            new_users.append((result['id'], timestamp))
-        AppData.add_user_ids(self.name, new_users)
-
-    def save(self):
-        if not self._results or not self._output:
-            return
-        out_dir = os.path.join(Config.out_dir, self._output or self.uid)
-        extension = Config.out_extension or DEFAULT_OUTPUT_EXTENSION
-        marker = self._results[0]
-        stamp = datetime.utcnow()
-        uid = marker['id']
-        filename = f'{stamp:%Y-%m-%d_%H-%M-%S}_{uid}{extension}'
-        file_path = os.path.join(out_dir, filename)
-        results_str = '\n'.join(json.dumps(r) for r in self._results)
-        write(f'{results_str}\n', file_path)
-        self.log(f'Wrote {len(self.results)} tweets to "{file_path}"')

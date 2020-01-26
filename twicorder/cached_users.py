@@ -7,10 +7,10 @@ from threading import Lock
 from twicorder.utils import collect_key_values
 from twicorder.config import Config
 from twicorder.constants import DEFAULT_EXPAND_USERS_INTERVAL
-from twicorder.queries import RequestQuery
+from twicorder.queries import ProductionRequestQuery
 
 
-class UserQuery(RequestQuery):
+class UserQuery(ProductionRequestQuery):
 
     name = 'cached_user'
     endpoint = '/users/lookup'
@@ -20,9 +20,6 @@ class UserQuery(RequestQuery):
         self._kwargs['tweet_mode'] = 'extended'
         self._kwargs['include_entities'] = 'true'
         self._kwargs.update(kwargs)
-
-    def bake_ids(self):
-        return
 
     def save(self):
         for user in self.results:
@@ -169,7 +166,7 @@ class CachedUserCentral:
                 missing_users[i:i + n] for i in range(0, len(missing_users), n)
             ]
             for chunk in chunks:
-                UserQuery(user_id=','.join([str(u) for u in chunk])).run()
+                UserQuery(user_id=','.join([str(u) for u in chunk])).start()
             for tweet in tweets:
                 mention_sections = collect_key_values('user_mentions', tweet)
                 for mention_section in mention_sections:

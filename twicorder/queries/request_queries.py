@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import json
-import os
 import urllib
 
-from datetime import datetime, timedelta
-
-from twicorder.appdata import AppData
 from twicorder.cached_users import CachedUserCentral
 from twicorder.config import Config
-from twicorder.constants import DEFAULT_EXPAND_USERS, DEFAULT_OUTPUT_EXTENSION
-from twicorder.queries import RequestQuery, UserBaseQuery
-from twicorder.utils import write
+from twicorder.constants import DEFAULT_EXPAND_USERS
+from twicorder.queries import (
+    BaseRequestQuery,
+    ProductionRequestQuery,
+    TweetRequestQuery
+)
 
 
-class UserLookupQuery(UserBaseQuery):
+class UserLookupQuery(ProductionRequestQuery):
     """
     Example for tasks.yaml:
 
@@ -38,13 +36,17 @@ class UserLookupQuery(UserBaseQuery):
     endpoint = '/users/lookup'
 
     def __init__(self, output=None, **kwargs):
-        super(UserBaseQuery, self).__init__(output, **kwargs)
+        super().__init__(output, **kwargs)
         self._kwargs['tweet_mode'] = 'extended'
         self._kwargs['include_entities'] = 'true'
         self._kwargs.update(kwargs)
 
+    def finalise(self, response):
+        self.bake_ids()
+        self.log(f'Cached {self.type.title()} IDs to disk!')
 
-class FollowerIDQuery(UserBaseQuery):
+
+class FollowerIDQuery(ProductionRequestQuery):
     """
     Example for tasks.yaml:
 
@@ -69,7 +71,7 @@ class FollowerIDQuery(UserBaseQuery):
     _fetch_more_path = 'next_cursor'
 
     def __init__(self, output=None, **kwargs):
-        super(UserBaseQuery, self).__init__(output, **kwargs)
+        super().__init__(output, **kwargs)
         self._kwargs['count'] = '5000'
         self._kwargs.update(kwargs)
 
@@ -82,51 +84,21 @@ class FollowerIDQuery(UserBaseQuery):
             url += f'?{urllib.parse.urlencode(self.kwargs)}'
         return url
 
-    def bake_ids(self):
+    def result_id(self, result: object) -> str:
         """
-        Saves a cache of user IDs from query result to disk. In storing the IDs
-        between sessions, we ensure crawled data is not lost between sessions.
+        For a given result produced by the current query, return its ID.
 
-        To prevent the disk cache growing too large, we purge IDs for users
-        crawled more than 14 days ago.
+        Args:
+            result (object): One single result object
+
+        Returns:
+            str: Timestamp
+
         """
-
-        # Loading picked tweet IDs
-        users = dict(AppData.get_user_ids(self.name)) or {}
-
-        # Purging tweet IDs older than 14 days
-        now = datetime.now()
-        old_users = users.copy()
-        users = {}
-        for user_id, timestamp in old_users.items():
-            dt = datetime.fromtimestamp(timestamp)
-            if not now - dt > timedelta(days=14):
-                users[user_id] = timestamp
-
-        # Stores tweet IDs from result
-        self._results = [u for u in self.results if u not in users]
-        new_users = []
-        for result in self.results:
-            dt = datetime.utcnow()
-            timestamp = int(dt.timestamp())
-            new_users.append((result, timestamp))
-        AppData.add_user_ids(self.name, new_users)
-
-    def save(self):
-        if not self._results or not self._output:
-            return
-        out_dir = os.path.join(Config.out_dir, self._output or self.uid)
-        extension = Config.out_extension or DEFAULT_OUTPUT_EXTENSION
-        marker = self._results[0]
-        stamp = datetime.utcnow()
-        filename = f'{stamp:%Y-%m-%d_%H-%M-%S}_{marker}{extension}'
-        file_path = os.path.join(out_dir, filename)
-        results_str = '\n'.join(json.dumps(r) for r in self._results)
-        write(f'{results_str}\n', file_path)
-        self.log(f'Wrote {len(self.results)} tweets to "{file_path}"')
+        return str(result)
 
 
-class StatusQuery(RequestQuery):
+class StatusQuery(TweetRequestQuery):
 
     name = 'status'
     endpoint = '/statuses/lookup'
@@ -145,7 +117,7 @@ class StatusQuery(RequestQuery):
         raise NotImplementedError(msg)
 
 
-class TimelineQuery(RequestQuery):
+class TimelineQuery(TweetRequestQuery):
     """
     Example for tasks.yaml:
 
@@ -187,15 +159,16 @@ class TimelineQuery(RequestQuery):
         return url
 
     def run(self):
-        super(TimelineQuery, self).run()
+        response = super(TimelineQuery, self).run()
         self.done = False
         if not self.results:
             self.done = True
-            return
+            return response
         self._more_results = self.results[-1]['id_str']
         last_return = self.kwargs.get('max_id')
         if last_return and int(self._more_results) >= int(last_return):
             self.done = True
+        return response
 
     def save(self):
         if Config.full_user_mentions or DEFAULT_EXPAND_USERS:
@@ -204,7 +177,7 @@ class TimelineQuery(RequestQuery):
         super(TimelineQuery, self).save()
 
 
-class StandardSearchQuery(RequestQuery):
+class StandardSearchQuery(TweetRequestQuery):
 
     name = 'free_search'
     endpoint = '/search/tweets'
@@ -241,32 +214,33 @@ class StandardSearchQuery(RequestQuery):
         super(StandardSearchQuery, self).save()
 
 
-class FullArchiveGetQuery(RequestQuery):
+class FullArchiveGetQuery(TweetRequestQuery):
 
     name = 'fullarchive_get'
     endpoint = '/tweets/search/fullarchive/production'
     _fetch_more_path = 'next'
 
 
-class FullArchivePostQuery(RequestQuery):
+class FullArchivePostQuery(TweetRequestQuery):
 
     name = 'fullarchive_post'
     endpoint = '/tweets/search/fullarchive/production'
     _fetch_more_path = 'next'
     _request_type = 'post'
-    _token_auth = True
+    _user_auth = True
 
 
-class FriendsList(RequestQuery):
+class FriendsList(ProductionRequestQuery):
 
     name = 'friends_list'
     endpoint = '/friends/list'
 
 
-class RateLimitStatusQuery(RequestQuery):
+class RateLimitStatusQuery(BaseRequestQuery):
 
     name = 'rate_limit_status'
     endpoint = '/application/rate_limit_status'
+    _user_auth = True
 
 
 if __name__ == '__main__':
