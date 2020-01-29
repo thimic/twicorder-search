@@ -5,7 +5,7 @@ import urllib
 
 from twicorder.cached_users import CachedUserCentral
 from twicorder.config import Config
-from twicorder.constants import DEFAULT_EXPAND_USERS
+from twicorder.constants import DEFAULT_EXPAND_USERS, RequestMethod
 from twicorder.queries import (
     BaseRequestQuery,
     ProductionRequestQuery,
@@ -78,7 +78,7 @@ class FollowerIDQuery(ProductionRequestQuery):
     @property
     def request_url(self):
         url = f'{self.base_url}{self.endpoint}.json'
-        if self.request_type == 'get':
+        if self.request_method is RequestMethod.Get:
             if self.more_results:
                 self.kwargs['cursor'] = self.more_results
             url += f'?{urllib.parse.urlencode(self.kwargs)}'
@@ -152,7 +152,7 @@ class TimelineQuery(TweetRequestQuery):
     @property
     def request_url(self):
         url = f'{self.base_url}{self.endpoint}.json'
-        if self.request_type == 'get':
+        if self.request_method is RequestMethod.Get:
             if self.more_results:
                 self.kwargs['max_id'] = self.more_results
             url += f'?{urllib.parse.urlencode(self.kwargs)}'
@@ -196,7 +196,7 @@ class StandardSearchQuery(TweetRequestQuery):
     @property
     def request_url(self):
         url = f'{self.base_url}{self.endpoint}.json'
-        if self.request_type == 'get':
+        if self.request_method == RequestMethod.Get:
             if self.more_results:
                 url += self.more_results
                 # API bug: 'search_metadata.next_results' does not include
@@ -226,8 +226,7 @@ class FullArchivePostQuery(TweetRequestQuery):
     name = 'fullarchive_post'
     endpoint = '/tweets/search/fullarchive/production'
     _fetch_more_path = 'next'
-    _request_type = 'post'
-    _user_auth = True
+    _request_method = RequestMethod.Post
 
 
 class FriendsList(ProductionRequestQuery):
@@ -240,7 +239,6 @@ class RateLimitStatusQuery(BaseRequestQuery):
 
     name = 'rate_limit_status'
     endpoint = '/application/rate_limit_status'
-    _user_auth = True
 
 
 if __name__ == '__main__':

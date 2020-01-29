@@ -3,6 +3,25 @@
 
 import os
 
+from enum import Enum
+
+
+class AuthMethod(Enum):
+    """
+    Enum with authentication options for queries.
+    """
+    App = 0
+    User = 1
+
+
+class RequestMethod(Enum):
+    """
+    Enum with request method for queries.
+    """
+    Get = 'get'
+    Post = 'post'
+
+
 DEFAULT_PROJECT_DIR = os.getcwd()
 DEFAULT_OUTPUT_EXTENSION = '.zip'
 

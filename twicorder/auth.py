@@ -5,12 +5,12 @@ import json
 import requests
 
 from requests.auth import AuthBase
-from requests_oauthlib import OAuth1Session, OAuth2Session
 
 from oauth2 import Client, Consumer, Token
 
 from twicorder import NoCredentialsException
 from twicorder.config import Config
+from twicorder.constants import AuthMethod, RequestMethod
 
 
 class Response:
@@ -42,39 +42,6 @@ class Response:
 
 
 class AuthHandler:
-
-    @staticmethod
-    def user_request(uri: str, method: str, headers=None) -> Response:
-        if headers is None:
-            headers = {}
-        client = Auth.client()
-        resp, data = client.request(uri, method=method.upper(), headers=headers)
-        resp_headers = {k: v for k, v in resp.items()}
-        response = Response(
-            status=resp.status,
-            reason=resp.reason,
-            headers=resp_headers,
-            data=data
-        )
-        return response
-
-    @staticmethod
-    def app_request(uri: str, method: str, headers=None) -> Response:
-        if headers is None:
-            headers = {}
-        session = Auth.session()
-        request = getattr(session, method)
-        resp = request(uri, headers=headers)
-        response = Response(
-            status=resp.status_code,
-            reason=resp.reason,
-            headers=resp.headers,
-            data=resp.json()
-        )
-        return response
-
-
-class Auth:
     """
     Class for handling API authentication.
     """
@@ -109,31 +76,12 @@ class Auth:
         return cls._client
 
     @classmethod
-    def session(cls):
-        """
-        Creates an OAuth1Session or returns an existing one.
-
-        Returns:
-            OAuth1Session: Logged in session
-
-        """
-        if not (Config.consumer_key and Config.consumer_secret):
-            raise NoCredentialsException
-        if not cls._session:
-            cls._session = OAuth1Session(
-                client_key=Config.consumer_key,
-                client_secret=Config.consumer_secret
-            )
-            OAuth2Session()
-        return cls._session
-
-    @classmethod
     def token(cls):
         """
         Requests an OAuth2 bearer token from the API.
 
         Returns:
-            OAuth2Bearer: Token object
+            OAuth2Bearer: Token bearer object
 
         """
         if not (Config.consumer_key and Config.consumer_secret):
@@ -155,6 +103,53 @@ class Auth:
 
             cls._bearer_token = OAuth2Bearer(data['access_token'])
         return cls._bearer_token
+
+    @classmethod
+    def request(cls, auth_method: AuthMethod, uri: str, method: RequestMethod,
+                headers=None):
+        if auth_method is AuthMethod.App:
+            return cls.app_request(uri=uri, method=method, headers=headers)
+        elif auth_method is AuthMethod.User:
+            return cls.user_request(uri=uri, method=method, headers=headers)
+
+    @classmethod
+    def user_request(cls, uri: str, method: RequestMethod,
+                     headers=None) -> Response:
+        if headers is None:
+            headers = {}
+        client = cls.client()
+        resp, data = client.request(
+            uri,
+            method=method.value.upper(),
+            headers=headers
+        )
+        resp_headers = {k: v for k, v in resp.items()}
+        response = Response(
+            status=resp.status,
+            reason=resp.reason,
+            headers=resp_headers,
+            data=data
+        )
+        return response
+
+    @classmethod
+    def app_request(cls, uri: str, method: RequestMethod,
+                    headers=None) -> Response:
+        if headers is None:
+            headers = {}
+        resp = requests.request(
+            method=method.value,
+            url=uri,
+            headers=headers,
+            auth=cls.token()
+        )
+        response = Response(
+            status=resp.status_code,
+            reason=resp.reason,
+            headers=resp.headers,
+            data=resp.json()
+        )
+        return response
 
 
 class OAuth2Bearer(AuthBase):

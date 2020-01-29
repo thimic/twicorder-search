@@ -16,11 +16,15 @@ from twicorder.appdata import AppData
 from twicorder.auth import AuthHandler
 from twicorder.config import Config
 from twicorder.constants import (
+    AuthMethod,
     DEFAULT_OUTPUT_EXTENSION,
+    RequestMethod,
     TW_TIME_FORMAT
 )
 from twicorder.rate_limits import RateLimitCentral
 from twicorder.utils import write, timestamp_to_datetime
+
+from typing import Set
 
 
 class BaseQuery:
@@ -262,8 +266,9 @@ class BaseRequestQuery(BaseQuery):
     Queries based on the requests module and the twitter API.
     """
     _base_url = 'https://api.twitter.com/1.1'
-    _request_type = 'get'
-    _user_auth = False
+    _request_method = RequestMethod.Get
+    _auth_methods = {AuthMethod.App, AuthMethod.User}
+    _auth_method = AuthMethod.App
 
     _hash_keys = [
         'endpoint',
@@ -280,27 +285,35 @@ class BaseRequestQuery(BaseQuery):
         return type(self) == type(other) and self.uid == other.uid
 
     @property
-    def base_url(self):
+    def base_url(self) -> str:
         return self._base_url
 
     @property
-    def request_type(self):
-        return self._request_type
+    def request_method(self) -> RequestMethod:
+        return self._request_method
 
     @property
-    def user_auth(self):
-        return self._user_auth
+    def auth_method(self) -> AuthMethod:
+        return self._auth_method
+
+    @auth_method.setter
+    def auth_method(self, auth_method: AuthMethod):
+        self._auth_method = auth_method
 
     @property
-    def request_url(self):
+    def auth_methods(self) -> Set[AuthMethod]:
+        return self._auth_methods
+
+    @property
+    def request_url(self) -> str:
         url = f'{self.base_url}{self.endpoint}.json'
-        if self.request_type == 'get':
+        if self.request_method is RequestMethod.Get:
             if self.kwargs:
                 url += f'?{urllib.parse.urlencode(self.kwargs)}'
         return url
 
     @property
-    def uid(self):
+    def uid(self) -> str:
         hash_str = str([getattr(self, k) for k in self._hash_keys]).encode()
         return hashlib.blake2s(hash_str).hexdigest()
 
@@ -311,22 +324,20 @@ class BaseRequestQuery(BaseQuery):
     def run(self):
 
         self.log(f'URL: {self.request_url}')
+        self.log(f'Method: {self.request_method.name}')
+        self.log(f'Auth: {self.auth_method.name}')
 
         # Perform query
         attempts = 0
         while True:
             try:
-                if self.user_auth:
-                    response = AuthHandler.user_request(
-                        uri=self.request_url,
-                        method=self.request_type
-                    )
-                else:
-                    response = AuthHandler.app_request(
-                        uri=self.request_url,
-                        method=self.request_type
-                    )
+                response = AuthHandler.request(
+                    auth_method=self.auth_method,
+                    uri=self.request_url,
+                    method=self.request_method
+                )
             except Exception as e:
+                self.log(f'Request failed: {e}')
                 attempts += 1
                 time.sleep(2**attempts)
                 if attempts >= 5:
@@ -341,6 +352,7 @@ class BaseRequestQuery(BaseQuery):
                 self.log(f'Rate Limit in effect: {response.reason}')
                 self.log(f'Message: {response.data.get("message")}')
                 RateLimitCentral.insert(
+                    auth_method=self.auth_method,
                     endpoint=self.endpoint,
                     limit=0,
                     remaining=0,
@@ -348,7 +360,7 @@ class BaseRequestQuery(BaseQuery):
                 )
             else:
                 self.log(
-                    '<{r.status_code}> {r.reason}: {r.content}'
+                    '<{r.status}> {r.reason}: {r.data}'
                     .format(r=response)
                 )
             return response
@@ -387,10 +399,27 @@ class ProductionRequestQuery(BaseRequestQuery):
     def setup(self):
         super().setup()
         # Check rate limit for query. Sleep if limits are in effect.
-        limit = RateLimitCentral.get(self.endpoint)
-        self.log(f'{limit}')
-        if limit and limit.remaining == 0:
-            sleep_time = max(limit.reset - time.time(), 0) + 2
+        limits = {}
+
+        # Loop over available auth methods to check for rate limits
+        for auth_method in self.auth_methods:
+            limit = RateLimitCentral.get(auth_method, self.endpoint)
+            self.log(f'{auth_method.name}: {limit}')
+
+            # If rate limit is in effect for this method, log it and try the
+            # next one
+            if limit and limit.remaining == 0:
+                limits[auth_method] = limit
+            else:
+                self._auth_method = auth_method
+                break
+
+        # If all methods were logged, rate limits are in effect everywhere.
+        # Pick the auth method with the closest reset and wait.
+        if self.auth_methods and len(limits) == len(self.auth_methods):
+            shortest_wait = sorted(limits.items(), key=lambda x: x[1].reset)[0]
+            self._auth_method = shortest_wait[0]
+            sleep_time = max(shortest_wait[1].reset - time.time(), 0) + 2
             msg = (
                 f'Sleeping for {sleep_time:.02f} seconds for endpoint '
                 f'"{self.endpoint}".'
@@ -402,7 +431,11 @@ class ProductionRequestQuery(BaseRequestQuery):
         super().finalise(response)
 
         # Update rate limit for query
-        RateLimitCentral.update(self.endpoint, response.headers)
+        RateLimitCentral.update(
+            auth_method=self.auth_method,
+            endpoint=self.endpoint,
+            header=response.headers
+        )
 
         # Save and store IDs for crawled tweets found in the query result.
         # Also record the last tweet ID found.

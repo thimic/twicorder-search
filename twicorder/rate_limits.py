@@ -5,19 +5,25 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from twicorder.constants import AuthMethod
+
 
 class RateLimitCentral:
     """
     Class keeping track of end points and their rate limits.
     """
-    _limits = {}
+    _limits = {
+        AuthMethod.App: {},
+        AuthMethod.User: {}
+    }
 
     @classmethod
-    def update(cls, endpoint, header):
+    def update(cls, auth_method: AuthMethod, endpoint: str, header: dict):
         """
         Update endpoint with latest rate limit information.
 
         Args:
+            auth_method (AuthMethod): Authentication method
             endpoint (str): Endpoint
             header (dict): Query response header
 
@@ -29,96 +35,115 @@ class RateLimitCentral:
         }
         if not limit_keys.issubset(header.keys()):
             return
-        cls._limits[endpoint] = RateLimit(header)
+        cls._limits[auth_method][endpoint] = RateLimit(header)
 
     @classmethod
-    def insert(cls, endpoint: str, limit: int, remaining: int, reset: float):
+    def insert(cls, auth_method: AuthMethod, endpoint: str, limit: int,
+               remaining: int, reset: float):
         """
         Create rate limit object from values, rather than headers.
 
         Args:
+            auth_method (AuthMethod): Authentication method
             endpoint (str): Endpoint
             limit (int): Query cap for the given endpoint
             remaining (int): Remaining queries for the given endpoint
             reset (float): Time until the current 15 minute window expires
 
         """
-        cls._limits[endpoint] = RateLimit.create(limit, remaining, reset)
+        cls._limits[auth_method][endpoint] = RateLimit.create(
+            limit,
+            remaining,
+            reset
+        )
 
     @classmethod
-    def _load_rate_limits(cls):
+    def _load_rate_limits(cls, auth_method: AuthMethod):
         """
         Load all rate limits.
+
+        Args:
+            auth_method (AuthMethod): Authentication method
+
         """
         from twicorder.queries.request_queries import RateLimitStatusQuery
         query = RateLimitStatusQuery()
+        query.auth_method = auth_method
         results = query.start()
         for resource, family in results['resources'].items():
             for endpoint, limit_data in family.items():
-                cls.insert(endpoint=endpoint, **limit_data)
+                cls.insert(
+                    auth_method=auth_method,
+                    endpoint=endpoint,
+                    **limit_data
+                )
 
     @classmethod
-    def get(cls, endpoint):
+    def get(cls, auth_method: AuthMethod, endpoint: str):
         """
         Retrieves latest rate limit information for the given endpoint.
         Args:
+            auth_method (AuthMethod): Authentication method
             endpoint (str): Endpoint
 
         Returns:
             RateLimit: Rate limit object
 
         """
-        if not cls._limits.get(endpoint):
-            cls._load_rate_limits()
-        return cls._limits.get(endpoint)
+        if not cls._limits[auth_method].get(endpoint):
+            cls._load_rate_limits(auth_method)
+        return cls._limits[auth_method].get(endpoint)
 
     @classmethod
-    def get_cap(cls, endpoint):
+    def get_cap(cls, auth_method: AuthMethod, endpoint: str):
         """
         Retrieve the query limit for the given endpoint.
 
         Args:
+            auth_method (AuthMethod): Authentication method
             endpoint (str): Endpoint
 
         Returns:
             int: Max queries per 15 minutes
 
         """
-        limit = cls.get(endpoint)
+        limit = cls.get(auth_method, endpoint)
         if not limit:
             return
         return limit.cap
 
     @classmethod
-    def get_remaining(cls, endpoint):
+    def get_remaining(cls, auth_method: AuthMethod, endpoint: str):
         """
         Retrieve number of remaining queries for the given endpoint.
 
         Args:
+            auth_method (AuthMethod): Authentication method
             endpoint (str): Endpoint
 
         Returns:
             int: Remaining queries for the current 15 minute window
 
         """
-        limit = cls.get(endpoint)
+        limit = cls.get(auth_method, endpoint)
         if not limit:
             return
         return limit.remaining
 
     @classmethod
-    def get_reset(cls, endpoint):
+    def get_reset(cls, auth_method: AuthMethod, endpoint: str):
         """
         Retrieve time until the current 15 minute window expires.
 
         Args:
+            auth_method (AuthMethod): Authentication method
             endpoint (str): Endpoint
 
         Returns:
             float: Time in seconds
 
         """
-        limit = cls.get(endpoint)
+        limit = cls.get(auth_method, endpoint)
         if not limit:
             return
         return limit.reset

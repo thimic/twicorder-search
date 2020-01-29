@@ -41,8 +41,8 @@ class Twicorder:
 
         # Test setup before continuing
         try:
-            from twicorder.auth import Auth
-            Auth.session()
+            from twicorder.auth import AuthHandler
+            AuthHandler.token()
         except TwicorderException as error:
             logger.critical(error)
             sys.exit(1)

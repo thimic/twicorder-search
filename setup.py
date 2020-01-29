@@ -56,6 +56,5 @@ setuptools.setup(
         'pymongo',
         'pyyaml',
         'requests',
-        'requests_oauthlib',
     ],
 )
