@@ -640,7 +640,7 @@ class BaseRequestQuery(BaseQuery):
                 results = results.get(token, [])
         self._results = results
         self._result_count += len(results)
-        if self._result_count >= self._max_count:
+        if self._max_count and self._result_count >= self._max_count:
             self._done = True
         self.log(f'Result count: {len(results)}')
 

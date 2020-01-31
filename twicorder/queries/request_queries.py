@@ -183,7 +183,7 @@ class TimelineQuery(TweetRequestQuery):
     _cursor_key = 'since_id'
 
     def __init__(self, output=None, max_count=0, **kwargs):
-        super().__init__(output, **kwargs)
+        super().__init__(output, max_count, **kwargs)
         self._kwargs['tweet_mode'] = 'extended'
         self._kwargs['result_type'] = 'recent'
         self._kwargs['count'] = 200
