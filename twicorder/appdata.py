@@ -92,7 +92,7 @@ class AppData:
             return cursor.fetchall()
 
     @classmethod
-    def set_last_query_id(cls, query_hash, object_id):
+    def set_last_cursor(cls, query_hash, object_id):
         cls._make_last_id_table()
         with cls._lock, cls._con as con:
             con.execute(
@@ -105,7 +105,7 @@ class AppData:
             )
 
     @classmethod
-    def get_last_query_id(cls, query_hash):
+    def get_last_cursor(cls, query_hash):
         cls._make_last_id_table()
         with cls._lock, cls._con as con:
             cursor = con.cursor()

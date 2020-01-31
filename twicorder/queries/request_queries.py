@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import requests
 import urllib
 
+from twicorder.appdata import AppData
 from twicorder.cached_users import CachedUserCentral
 from twicorder.config import Config
 from twicorder.constants import DEFAULT_EXPAND_USERS, RequestMethod
@@ -35,15 +37,23 @@ class UserLookupQuery(ProductionRequestQuery):
     name = 'user_lookups'
     endpoint = '/users/lookup'
 
-    def __init__(self, output=None, **kwargs):
-        super().__init__(output, **kwargs)
+    def __init__(self, output=None, max_count=0, **kwargs):
+        super().__init__(output, max_count, **kwargs)
         self._kwargs['tweet_mode'] = 'extended'
         self._kwargs['include_entities'] = 'true'
         self._kwargs.update(kwargs)
 
-    def finalise(self, response):
+    def finalise(self, response: requests.Response):
+        """
+        Method called immediately after the query runs.
+
+        Args:
+            response (requests.Response): Response to query
+
+        """
+        super().finalise(response)
         self.bake_ids()
-        self.log(f'Cached {self.type.title()} IDs to disk!')
+        self.log(f'Cached {self.type.name} IDs to disk!')
 
 
 class FollowerIDQuery(ProductionRequestQuery):
@@ -68,19 +78,28 @@ class FollowerIDQuery(ProductionRequestQuery):
     name = 'follower_ids'
     endpoint = '/followers/ids'
     _results_path = 'ids'
-    _fetch_more_path = 'next_cursor'
+    _next_cursor_path = 'next_cursor'
+    _cursor_key = 'cursor'
 
-    def __init__(self, output=None, **kwargs):
-        super().__init__(output, **kwargs)
+    def __init__(self, output=None, max_count=0, **kwargs):
+        super().__init__(output, max_count, **kwargs)
         self._kwargs['count'] = '5000'
         self._kwargs.update(kwargs)
 
     @property
-    def request_url(self):
+    def request_url(self) -> str:
+        """
+        Fully formatted request url constructed from base API url, end point and
+        keyword arguments.
+
+        Returns:
+            str: Constructed request url
+
+        """
         url = f'{self.base_url}{self.endpoint}.json'
         if self.request_method is RequestMethod.Get:
-            if self.more_results:
-                self.kwargs['cursor'] = self.more_results
+            if self.next_cursor:
+                self.kwargs['cursor'] = self.next_cursor
             url += f'?{urllib.parse.urlencode(self.kwargs)}'
         return url
 
@@ -92,10 +111,31 @@ class FollowerIDQuery(ProductionRequestQuery):
             result (object): One single result object
 
         Returns:
-            str: Timestamp
+            str: Result ID
 
         """
         return str(result)
+
+    def finalise(self, response: requests.Response):
+        """
+        Method called immediately after the query runs.
+
+        Args:
+            response (requests.Response): Response to query
+
+        """
+        super().finalise(response)
+
+        if self.results:
+            self.last_cursor = self.response_data.get('next_cursor')
+
+        # Cache last tweet ID found to disk if the query, including all pages
+        # completed successfully. This saves us from searching all the way back
+        # to the beginning on next crawl. Instead we can stop when we encounter
+        # this tweet.
+        if self._done and self.last_cursor:
+            self.log(f'Cached ID of last tweet returned by query to disk.')
+            AppData.set_last_cursor(self.uid, self.last_cursor)
 
 
 class StatusQuery(TweetRequestQuery):
@@ -103,14 +143,17 @@ class StatusQuery(TweetRequestQuery):
     name = 'status'
     endpoint = '/statuses/lookup'
 
-    def __init__(self, output=None, **kwargs):
-        super(StatusQuery, self).__init__(output, **kwargs)
+    def __init__(self, output=None, max_count=0, **kwargs):
+        super().__init__(output, max_count, **kwargs)
         self._kwargs['tweet_mode'] = 'extended'
         self._kwargs['include_entities'] = 'true'
         self._kwargs['trim_user'] = 'false'
         self._kwargs.update(kwargs)
 
     def save(self):
+        """
+        Save the results of the query to disk.
+        """
         for status in self.results:
             pass
         msg = f'Save for endpoint "{self.endpoint}" is not yet implemented.'
@@ -137,10 +180,10 @@ class TimelineQuery(TweetRequestQuery):
 
     name = 'user_timeline'
     endpoint = '/statuses/user_timeline'
-    _last_return_token = 'since_id'
+    _cursor_key = 'since_id'
 
-    def __init__(self, output=None, **kwargs):
-        super(TimelineQuery, self).__init__(output, **kwargs)
+    def __init__(self, output=None, max_count=0, **kwargs):
+        super().__init__(output, **kwargs)
         self._kwargs['tweet_mode'] = 'extended'
         self._kwargs['result_type'] = 'recent'
         self._kwargs['count'] = 200
@@ -150,16 +193,27 @@ class TimelineQuery(TweetRequestQuery):
         self._kwargs.update(kwargs)
 
     @property
-    def request_url(self):
+    def request_url(self) -> str:
+        """
+        Fully formatted request url constructed from base API url, end point and
+        keyword arguments.
+
+        Returns:
+            str: Constructed request url
+
+        """
         url = f'{self.base_url}{self.endpoint}.json'
         if self.request_method is RequestMethod.Get:
-            if self.more_results:
-                self.kwargs['max_id'] = self.more_results
+            if self.next_cursor:
+                self.kwargs['max_id'] = self.next_cursor
             url += f'?{urllib.parse.urlencode(self.kwargs)}'
         return url
 
     def run(self):
-        response = super(TimelineQuery, self).run()
+        """
+        Method that executes main query. Use start() to execute.
+        """
+        response = super().run()
         self.done = False
         if not self.results:
             self.done = True
@@ -171,6 +225,9 @@ class TimelineQuery(TweetRequestQuery):
         return response
 
     def save(self):
+        """
+        Save the results of the query to disk.
+        """
         if Config.full_user_mentions or DEFAULT_EXPAND_USERS:
             self.log('Expanding user mentions!')
             CachedUserCentral.expand_user_mentions(self.results)
@@ -181,12 +238,12 @@ class StandardSearchQuery(TweetRequestQuery):
 
     name = 'free_search'
     endpoint = '/search/tweets'
-    _last_return_token = 'since_id'
+    _cursor_key = 'since_id'
     _results_path = 'statuses'
-    _fetch_more_path = 'search_metadata.next_results'
+    _next_cursor_path = 'search_metadata.next_results'
 
-    def __init__(self, output=None, **kwargs):
-        super(StandardSearchQuery, self).__init__(output, **kwargs)
+    def __init__(self, output=None, max_count=0, **kwargs):
+        super().__init__(output, max_count, **kwargs)
         self._kwargs['tweet_mode'] = 'extended'
         self._kwargs['result_type'] = 'recent'
         self._kwargs['count'] = 100
@@ -194,11 +251,19 @@ class StandardSearchQuery(TweetRequestQuery):
         self._kwargs.update(kwargs)
 
     @property
-    def request_url(self):
+    def request_url(self) -> str:
+        """
+        Fully formatted request url constructed from base API url, end point and
+        keyword arguments.
+
+        Returns:
+            str: Constructed request url
+
+        """
         url = f'{self.base_url}{self.endpoint}.json'
         if self.request_method == RequestMethod.Get:
-            if self.more_results:
-                url += self.more_results
+            if self.next_cursor:
+                url += self.next_cursor
                 # API bug: 'search_metadata.next_results' does not include
                 # 'tweet_mode'. Adding it back in manually.
                 if 'tweet_mode=extended' not in url:
@@ -208,6 +273,9 @@ class StandardSearchQuery(TweetRequestQuery):
         return url
 
     def save(self):
+        """
+        Save the results of the query to disk.
+        """
         if Config.full_user_mentions or DEFAULT_EXPAND_USERS:
             self.log('Expanding user mentions!')
             CachedUserCentral.expand_user_mentions(self.results)
@@ -218,14 +286,14 @@ class FullArchiveGetQuery(TweetRequestQuery):
 
     name = 'fullarchive_get'
     endpoint = '/tweets/search/fullarchive/production'
-    _fetch_more_path = 'next'
+    _next_cursor_path = 'next'
 
 
 class FullArchivePostQuery(TweetRequestQuery):
 
     name = 'fullarchive_post'
     endpoint = '/tweets/search/fullarchive/production'
-    _fetch_more_path = 'next'
+    _next_cursor_path = 'next'
     _request_method = RequestMethod.Post
 
 

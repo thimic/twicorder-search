@@ -26,6 +26,7 @@ class Task:
         self._remaining = iterations
         self._output = output
         self._kwargs = kwargs
+        self._queries = []
 
         self._last_run = None
 
@@ -134,21 +135,26 @@ class Task:
             bool: True if all task iterations are done, else False
 
         """
+        alive_queries = []
+        for query in self._queries:
+            if query.done:
+                self._remaining -= 1
+            else:
+                alive_queries.append(query)
+        self._queries = alive_queries
+
         return self._iterations != 0 and self._remaining == 0
 
-    def checkout(self) -> Task:
+    def add_query(self, query: 'BaseQuery'):
         """
-        Decrements remaining iterations with one for tasks with a finite number
-        of iterations.
+        Add a query to the list of task queries.
 
-        Returns:
-            Task: This task
+        Args:
+            query (BaseQuery): Query for this task
 
         """
         self._last_run = time.time()
-        if self._iterations > 0 and self._remaining > 0:
-            self._remaining -= 1
-        return self
+        self._queries.append(query)
 
 
 class TaskManager:
@@ -172,6 +178,7 @@ class TaskManager:
                     frequency=frequency,
                     iterations=iters,
                     output=raw_task.get('output') or query,
+                    max_count=raw_task.get('max_count') or 0,
                     **raw_task.get('kwargs') or DEFAULT_TASK_KWARGS
                 )
                 self._tasks.append(task)

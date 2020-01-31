@@ -22,6 +22,15 @@ class RequestMethod(Enum):
     Post = 'post'
 
 
+class ResultType(Enum):
+    """
+    Enum with result types for queries.
+    """
+    Generic = 0
+    Tweet = 1
+    User = 2
+
+
 DEFAULT_PROJECT_DIR = os.getcwd()
 DEFAULT_OUTPUT_EXTENSION = '.zip'
 

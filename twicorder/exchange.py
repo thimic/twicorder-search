@@ -42,7 +42,9 @@ class QueryWorker(Thread):
         """
         Fetches query from queue and executes it.
         """
+        self._running = True
         while self._running:
+            # Blocking call
             self._query = self.queue.get()
             if self.query is None:
                 logger.debug(
@@ -61,6 +63,8 @@ class QueryWorker(Thread):
                 time.sleep(.2)
             self._query = None
             self.queue.task_done()
+            if self.queue.empty():
+                break
             time.sleep(.5)
 
 
@@ -74,14 +78,13 @@ class QueryExchange:
     failure = False
 
     @classmethod
-    def get_queue(cls, endpoint, callback=None):
+    def get_queue(cls, endpoint: str) -> Queue:
         """
         Retrieves the queue for the given endpoint if it exists, otherwise
         creates a queue.
 
         Args:
             endpoint (str): API endpoint
-            callback (func): Callback function that handles query results
 
         Returns:
             Queue: Queue for endpoint
@@ -90,11 +93,32 @@ class QueryExchange:
         if not cls.queues.get(endpoint):
             queue = Queue()
             cls.queues[endpoint] = queue
-            thread = QueryWorker(name=endpoint)
-            thread.setup(queue=queue, on_result=callback)
-            thread.start()
-            cls.threads[endpoint] = thread
         return cls.queues[endpoint]
+
+    @classmethod
+    def start_thread(cls, endpoint: str, queue: Queue, callback=None) -> QueryWorker:
+        """
+        Retrieves the thread for the given endpoint if it exists. If a thread
+        exists and is alive, return it. Otherwise create a new thread and start
+        it.
+
+        Args:
+            endpoint (str): API endpoint
+            queue (Queue): Work queue for thread
+            callback (func): Callback function that handles query results
+
+        Returns:
+            QueryWorker: Worker thread
+
+        """
+        thread = cls.threads.get(endpoint)
+        if thread and thread.is_alive():
+            return thread
+        thread = QueryWorker(name=endpoint)
+        thread.setup(queue=queue, on_result=callback)
+        thread.start()
+        cls.threads[endpoint] = thread
+        return thread
 
     @classmethod
     def add(cls, query, callback=None):
@@ -106,14 +130,11 @@ class QueryExchange:
             callback (func): Callback function that handles query results
 
         """
-        queue = cls.get_queue(query.endpoint, callback)
+        queue = cls.get_queue(query.endpoint)
         if query in queue.queue:
             logger.info(f'Query with ID {query.uid} is already in the queue.')
             return
-        thread = cls.threads.get(query.endpoint)
-        if thread and thread.query == query:
-            logger.info(f'Query with ID {query.uid} is already running.')
-            return
+        cls.start_thread(query.endpoint, queue, callback)
         queue.put(query)
 
     @classmethod

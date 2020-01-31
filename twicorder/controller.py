@@ -155,7 +155,9 @@ class Twicorder:
         """
         query_object = self.query_types[task.name]
         query = query_object(task.output, **task.kwargs)
-        task.checkout()
+        task.add_query(query)
+        print(f'Task name: {task.name}, remaining: {task.remaining}')
+        # task.checkout()
         return query
 
     @staticmethod
