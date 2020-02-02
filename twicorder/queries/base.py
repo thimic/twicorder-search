@@ -588,6 +588,8 @@ class BaseRequestQuery(BaseQuery):
                 )
             except Exception as e:
                 self.log(f'Request failed: {e}')
+                import traceback
+                traceback.print_exc()
                 attempts += 1
                 time.sleep(2**attempts)
                 if attempts >= 5:
@@ -759,13 +761,12 @@ class TweetRequestQuery(ProductionRequestQuery):
         self.bake_ids()
         self.log(f'Cached {self.type.name} IDs to disk!')
         if self.results:
-            if self.type == ResultType.Tweet and self.last_cursor is None:
-                self.last_cursor = self.results[0].get('id')
+            self.last_cursor = self.results[0].get('id')
 
         # Cache last tweet ID found to disk if the query, including all pages
         # completed successfully. This saves us from searching all the way back
         # to the beginning on next crawl. Instead we can stop when we encounter
         # this tweet.
-        if self._done and self.last_cursor:
+        if self.last_cursor:
             self.log(f'Cached ID of last tweet returned by query to disk.')
             AppData.set_last_cursor(self.uid, self.last_cursor)

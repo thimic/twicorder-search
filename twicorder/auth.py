@@ -5,6 +5,7 @@ import json
 import requests
 
 from requests.auth import AuthBase
+from threading import Lock
 
 from oauth2 import Client, Consumer, Token
 
@@ -48,6 +49,8 @@ class AuthHandler:
     _session = None
     _bearer_token = None
     _client = None
+
+    _lock = Lock()
 
     @classmethod
     def client(cls):
@@ -118,11 +121,14 @@ class AuthHandler:
         if headers is None:
             headers = {}
         client = cls.client()
-        resp, data = client.request(
-            uri,
-            method=method.value.upper(),
-            headers=headers
-        )
+        # Only perform one request at a time
+        # Todo: Can we use a persistent session to get around the need for locks?
+        with cls._lock:
+            resp, data = client.request(
+                uri,
+                method=method.value.upper(),
+                headers=headers
+            )
         resp_headers = {k: v for k, v in resp.items()}
         response = Response(
             status=resp.status,
@@ -137,12 +143,15 @@ class AuthHandler:
                     headers=None) -> Response:
         if headers is None:
             headers = {}
-        resp = requests.request(
-            method=method.value,
-            url=uri,
-            headers=headers,
-            auth=cls.token()
-        )
+        # Only perform one request at a time
+        # Todo: Can we use a persistent session to get around the need for locks?
+        with cls._lock:
+            resp = requests.request(
+                method=method.value,
+                url=uri,
+                headers=headers,
+                auth=cls.token()
+            )
         response = Response(
             status=resp.status_code,
             reason=resp.reason,
