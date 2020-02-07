@@ -5,6 +5,7 @@
 #
 # free_search:                  # endpoint name
 #   - frequency: 60             # Interval between repeating queries in minutes
+#     iterations: 0             # Number of times to repeat the query, 0 means indefinitely
 #     output: github/mentions   # Output directory, relative to project directory
 #     kwargs:                   # Keyword Arguments to feed to endpoint
 #       q: @github              #   "q" for "query" in the case of free_search
@@ -37,3 +38,16 @@ free_search:
     output: "github/hashtags"
     kwargs:
       q: "#github"
+
+follower_ids:
+  - frequency: 60
+    iterations: 1
+    output: noradio/followers/ids
+    kwargs:
+      user_id: 783214
+  - frequency: 60
+    iterations: 1
+    output: noradio/followers/ids
+    kwargs:
+      screen_name: noradio
+      count: 200

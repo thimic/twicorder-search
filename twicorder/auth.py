@@ -120,15 +120,15 @@ class AuthHandler:
                      headers=None) -> Response:
         if headers is None:
             headers = {}
-        client = cls.client()
-        # Only perform one request at a time
+        # client = cls.client()
         # Todo: Can we use a persistent session to get around the need for locks?
-        with cls._lock:
-            resp, data = client.request(
-                uri,
-                method=method.value.upper(),
-                headers=headers
-            )
+        # Only perform one request at a time
+        # with cls._lock:
+        resp, data = cls.client().request(
+            uri,
+            method=method.value.upper(),
+            headers=headers
+        )
         resp_headers = {k: v for k, v in resp.items()}
         response = Response(
             status=resp.status,
@@ -141,17 +141,16 @@ class AuthHandler:
     @classmethod
     def app_request(cls, uri: str, method: RequestMethod,
                     headers=None) -> Response:
+        if not cls._session:
+            cls._session = requests.Session()
         if headers is None:
             headers = {}
-        # Only perform one request at a time
-        # Todo: Can we use a persistent session to get around the need for locks?
-        with cls._lock:
-            resp = requests.request(
-                method=method.value,
-                url=uri,
-                headers=headers,
-                auth=cls.token()
-            )
+        resp = cls._session.request(
+            method=method.value,
+            url=uri,
+            headers=headers,
+            auth=cls.token()
+        )
         response = Response(
             status=resp.status_code,
             reason=resp.reason,
