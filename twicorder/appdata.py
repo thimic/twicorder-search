@@ -45,6 +45,7 @@ class AppData:
                 )
                 '''
             )
+            await db.commit()
 
     @classmethod
     async def add_query_object(cls, query_name, object_id, timestamp):
@@ -61,6 +62,7 @@ class AppData:
                 ''',
                 (object_id, timestamp)
             )
+            await db.commit()
 
     @classmethod
     async def add_query_objects(cls, query_name, objects):
@@ -77,6 +79,7 @@ class AppData:
                 ''',
                 objects
             )
+            await db.commit()
 
     @classmethod
     async def get_query_objects(cls, query_name):
@@ -110,6 +113,7 @@ class AppData:
                 ''',
                 (query_hash, object_id)
             )
+            await db.commit()
 
     @classmethod
     async def get_last_cursor(cls, query_hash):
