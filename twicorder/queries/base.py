@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import asyncio
 import copy
 import hashlib
 import json
@@ -14,7 +15,7 @@ import yaml
 from datetime import datetime, timedelta
 
 from twicorder.appdata import AppData
-from twicorder.auth import AuthHandler
+from twicorder.aio_auth import AsyncAuthHandler
 from twicorder.config import Config
 from twicorder.constants import (
     AuthMethod,
@@ -64,10 +65,6 @@ class BaseQuery:
         self._kwargs = kwargs
         self._orig_kwargs = copy.deepcopy(kwargs)
         self._log = []
-
-        last_cursor = AppData.get_last_cursor(self.uid)
-        if last_cursor:
-            self.kwargs[self.cursor_key] = last_cursor
 
     def __eq__(self, other):
         return type(self) == type(other) and self.__dict__ == other.__dict__
@@ -303,19 +300,21 @@ class BaseQuery:
         """
         return self._mongo_support
 
-    def setup(self):
+    async def setup(self):
         """
         Method called immediately before the query runs.
         """
-        pass
+        last_cursor = await AppData.get_last_cursor(self.uid)
+        if last_cursor:
+            self.kwargs[self.cursor_key] = last_cursor
 
-    def run(self):
+    async def run(self):
         """
         Method that executes main query. Use start() to execute.
         """
         raise NotImplementedError
 
-    def finalise(self, response: requests.Response):
+    async def finalise(self, response: requests.Response):
         """
         Method called immediately after the query runs.
 
@@ -325,13 +324,13 @@ class BaseQuery:
         """
         pass
 
-    def start(self):
+    async def start(self):
         """
         Method for executing main setup, run and finalise queries in sequence.
         """
-        self.setup()
-        response = self.run()
-        self.finalise(response)
+        await self.setup()
+        response = await self.run()
+        await self.finalise(response)
         return self.results
 
     def result_timestamp(self, result) -> datetime:
@@ -384,7 +383,7 @@ class BaseQuery:
         log_data += '\n' + '=' * 80
         return log_data
 
-    def save(self):
+    async def save(self):
         """
         Save the results of the query to disk.
         """
@@ -421,7 +420,7 @@ class BaseQuery:
         else:
             self.log(f'Wrote {len(list(self.results))} tweets to MongoDB')
 
-    def bake_ids(self):
+    async def bake_ids(self):
         """
         Saves a cache of result IDs from query result to disk. In storing the
         IDs between sessions we make sure we don't save already found data.
@@ -432,7 +431,7 @@ class BaseQuery:
         """
 
         # Loading picked tweet IDs
-        results = dict(AppData.get_query_objects(self.name)) or {}
+        results = dict(await AppData.get_query_objects(self.name)) or {}
 
         # Purging tweet IDs older than 14 days
         now = datetime.now()
@@ -449,7 +448,7 @@ class BaseQuery:
         for result in self.results:
             timestamp = self.result_timestamp(result)
             new_results.append((result['id'], int(timestamp.timestamp())))
-        AppData.add_query_objects(self.name, new_results)
+        await AppData.add_query_objects(self.name, new_results)
 
 
 class BaseRequestQuery(BaseQuery):
@@ -561,14 +560,14 @@ class BaseRequestQuery(BaseQuery):
         hash_str = str([getattr(self, k) for k in self._hash_keys]).encode()
         return hashlib.blake2s(hash_str).hexdigest()
 
-    def setup(self):
+    async def setup(self):
         """
         Method called immediately before the query runs.
         """
         # Purging logs
         self._log = []
 
-    def run(self):
+    async def run(self):
         """
         Method that executes main query. Use start() to execute.
         """
@@ -581,17 +580,17 @@ class BaseRequestQuery(BaseQuery):
         attempts = 0
         while True:
             try:
-                response = AuthHandler.request(
+                response = await AsyncAuthHandler.request(
                     auth_method=self.auth_method,
-                    uri=self.request_url,
-                    method=self.request_method
+                    method=self.request_method,
+                    url=self.request_url,
                 )
             except Exception as e:
                 self.log(f'Request failed: {e}')
                 import traceback
                 traceback.print_exc()
                 attempts += 1
-                time.sleep(2**attempts)
+                await asyncio.sleep(2**attempts)
                 if attempts >= 5:
                     raise
             else:
@@ -599,10 +598,10 @@ class BaseRequestQuery(BaseQuery):
 
         # Check query response code. Return with error message if not a
         # successful 200 code.
-        if response.status != 200:
-            if response.status == 429:
-                self.log(f'Rate Limit in effect: {response.reason}')
-                self.log(f'Message: {response.data.get("message")}')
+        if response.status_code != 200:
+            if response.status_code == 429:
+                self.log(f'Rate Limit in effect: {response.reason_phrase}')
+                self.log(f'Message: {response.json().get("message")}')
                 RateLimitCentral.insert(
                     auth_method=self.auth_method,
                     endpoint=self.endpoint,
@@ -612,7 +611,7 @@ class BaseRequestQuery(BaseQuery):
                 )
             else:
                 self.log(
-                    '<{r.status}> {r.reason}: {r.data}'
+                    '<{r.status_code}> {r.reason_phrase}: {r.text}'
                     .format(r=response)
                 )
             return response
@@ -620,7 +619,7 @@ class BaseRequestQuery(BaseQuery):
 
         # Search query response for additional paged results. Pronounce the
         # query done if no more pages are found.
-        cursor = response.data.copy()
+        cursor = response.json().copy()
         if self.next_cursor_path:
             for token in self.next_cursor_path.split('.'):
                 cursor = cursor.get(token, {})
@@ -635,8 +634,8 @@ class BaseRequestQuery(BaseQuery):
             self._done = True
 
         # Extract crawled tweets from query response.
-        self._response_data = response.data
-        results = response.data.copy()
+        self._response_data = response.json()
+        results = response.json().copy()
         if self.results_path:
             for token in self.results_path.split('.'):
                 results = results.get(token, [])
@@ -656,17 +655,17 @@ class ProductionRequestQuery(BaseRequestQuery):
     rate limits counted.
     """
 
-    def setup(self):
+    async def setup(self):
         """
         Method called immediately before the query runs.
         """
-        super().setup()
+        await super().setup()
         # Check rate limit for query. Sleep if limits are in effect.
         limits = {}
 
         # Loop over available auth methods to check for rate limits
         for auth_method in self.auth_methods:
-            limit = RateLimitCentral.get(auth_method, self.endpoint)
+            limit = await RateLimitCentral.get(auth_method, self.endpoint)
             self.log(f'{auth_method.name}: {limit}')
 
             # If rate limit is in effect for this method, log it and try the
@@ -688,9 +687,9 @@ class ProductionRequestQuery(BaseRequestQuery):
                 f'"{self.endpoint}".'
             )
             self.log(msg)
-            time.sleep(sleep_time)
+            await asyncio.sleep(sleep_time)
 
-    def finalise(self, response: requests.Response):
+    async def finalise(self, response: requests.Response):
         """
         Method called immediately after the query runs.
 
@@ -698,7 +697,7 @@ class ProductionRequestQuery(BaseRequestQuery):
             response (requests.Response): Response to query
 
         """
-        super().finalise(response)
+        await super().finalise(response)
 
         # Update rate limit for query
         RateLimitCentral.update(
@@ -711,7 +710,7 @@ class ProductionRequestQuery(BaseRequestQuery):
         # Also record the last tweet ID found.
         if self.results:
             # Todo: Save in callback! Don't bake IDs before successful save?
-            # self.save()
+            # await self.save()
             pass
 
 
@@ -749,7 +748,7 @@ class TweetRequestQuery(ProductionRequestQuery):
         """
         return str(result['id'])
 
-    def finalise(self, response: requests.Response):
+    async def finalise(self, response: requests.Response):
         """
         Method called immediately after the query runs.
 
@@ -757,8 +756,8 @@ class TweetRequestQuery(ProductionRequestQuery):
             response (requests.Response): Response to query
 
         """
-        super().finalise(response)
-        self.bake_ids()
+        await super().finalise(response)
+        await self.bake_ids()
         self.log(f'Cached {self.type.name} IDs to disk!')
         if self.results:
             self.last_cursor = self.results[0].get('id')
@@ -769,4 +768,4 @@ class TweetRequestQuery(ProductionRequestQuery):
         # this tweet.
         if self.last_cursor:
             self.log(f'Cached ID of last tweet returned by query to disk.')
-            AppData.set_last_cursor(self.uid, self.last_cursor)
+            await AppData.set_last_cursor(self.uid, self.last_cursor)

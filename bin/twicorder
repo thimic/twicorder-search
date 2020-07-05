@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import click
+import asyncclick as click
+import faulthandler
 import sys
 import traceback
-import faulthandler
 
 from twicorder.constants import (
     DEFAULT_EXPAND_USERS_INTERVAL,
@@ -15,7 +15,7 @@ from twicorder.constants import (
 @click.group()
 @click.option('--project-dir', help='Root directory for project')
 @click.pass_context
-def cli(ctx, project_dir):
+def cli(ctx: click.Context, project_dir: str):
     """
     Twicorder Search
     """
@@ -37,7 +37,7 @@ def cli(ctx, project_dir):
     help='Purge logs and exit'
 )
 @click.pass_context
-def utils(ctx, clear_cache, purge_logs):
+def utils(ctx: click.Context, clear_cache: bool, purge_logs: bool):
     """
     Utility functions
     """
@@ -85,9 +85,11 @@ def utils(ctx, clear_cache, purge_logs):
     help='Seconds to timeout for internal data store'
 )
 @click.pass_context
-def run(ctx, consumer_key, consumer_secret, access_token, access_secret,
-        out_dir, out_extension, task_file, use_mongo, full_user_mentions,
-        user_lookup_interval, appdata_timeout):
+async def run(ctx: click.Context, consumer_key: str, consumer_secret: str,
+              access_token: str, access_secret: str, out_dir: str,
+              out_extension: str, task_file: str, use_mongo: bool,
+              full_user_mentions: bool, user_lookup_interval: int,
+              appdata_timeout: float):
     """
     Start crawler
     """
@@ -109,11 +111,14 @@ def run(ctx, consumer_key, consumer_secret, access_token, access_secret,
     from twicorder.controller import Twicorder
     twicorder = Twicorder()
     try:
-        twicorder.run()
+        await twicorder.run()
     except Exception:
         click.echo(traceback.format_exc())
         sys.exit(1)
 
 
 if __name__ == '__main__':
-    cli(auto_envvar_prefix='TWICORDER')
+    try:
+        cli(_anyio_backend='asyncio', auto_envvar_prefix='TWICORDER')
+    except KeyboardInterrupt:
+        sys.exit(0)

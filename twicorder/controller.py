@@ -6,9 +6,11 @@ import os
 import sys
 import time
 
+from asyncio import sleep
+
 from twicorder import TwicorderException
 from twicorder.config import Config
-from twicorder.logging import TwiLogger
+from twicorder.logger import TwiLogger
 from twicorder.tasks import TaskManager
 
 logger = TwiLogger()
@@ -100,7 +102,7 @@ class Twicorder:
         """
         self._running = False
 
-    def run(self):
+    async def run(self):
         """
         Starts crawler.
         """
@@ -129,7 +131,7 @@ class Twicorder:
                         logger.info('=' * 80)
                     continue
                 # Sleep 1 second, count the number of seconds slept and continue.
-                time.sleep(1)
+                await sleep(1)
                 slept += 1
         except KeyboardInterrupt:
             logger.info('\n' + '=' * 80)
@@ -139,7 +141,7 @@ class Twicorder:
             logger.info('\n' + '=' * 80)
             logger.info('No more tasks to execute. Exiting...')
             logger.info('=' * 80 + '\n')
-        QueryExchange.join_wait()
+        await QueryExchange.join_wait()
 
     def cast_query(self, task):
         """
@@ -161,7 +163,7 @@ class Twicorder:
         return query
 
     @staticmethod
-    def on_query_result(query):
+    async def on_query_result(query):
         """
         Slot that gets called when a result is ready for the given query.
 
@@ -169,5 +171,5 @@ class Twicorder:
             query (BaseQuery): Query object
 
         """
-        query.save()
+        await query.save()
 

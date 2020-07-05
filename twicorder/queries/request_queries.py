@@ -43,7 +43,7 @@ class UserLookupQuery(ProductionRequestQuery):
         self._kwargs['include_entities'] = 'true'
         self._kwargs.update(kwargs)
 
-    def finalise(self, response: requests.Response):
+    async def finalise(self, response: requests.Response):
         """
         Method called immediately after the query runs.
 
@@ -51,8 +51,8 @@ class UserLookupQuery(ProductionRequestQuery):
             response (requests.Response): Response to query
 
         """
-        super().finalise(response)
-        self.bake_ids()
+        await super().finalise(response)
+        await self.bake_ids()
         self.log(f'Cached {self.type.name} IDs to disk!')
 
 
@@ -116,7 +116,7 @@ class FollowerIDQuery(ProductionRequestQuery):
         """
         return str(result)
 
-    def finalise(self, response: requests.Response):
+    async def finalise(self, response: requests.Response):
         """
         Method called immediately after the query runs.
 
@@ -124,7 +124,7 @@ class FollowerIDQuery(ProductionRequestQuery):
             response (requests.Response): Response to query
 
         """
-        super().finalise(response)
+        await super().finalise(response)
 
         if self.results:
             self.last_cursor = self.response_data.get('next_cursor')
@@ -135,7 +135,7 @@ class FollowerIDQuery(ProductionRequestQuery):
         # this tweet.
         if self._done and self.last_cursor:
             self.log(f'Cached ID of last tweet returned by query to disk.')
-            AppData.set_last_cursor(self.uid, self.last_cursor)
+            await AppData.set_last_cursor(self.uid, self.last_cursor)
 
 
 class StatusQuery(TweetRequestQuery):
@@ -150,7 +150,7 @@ class StatusQuery(TweetRequestQuery):
         self._kwargs['trim_user'] = 'false'
         self._kwargs.update(kwargs)
 
-    def save(self):
+    async def save(self):
         """
         Save the results of the query to disk.
         """
@@ -209,29 +209,29 @@ class TimelineQuery(TweetRequestQuery):
             url += f'?{urllib.parse.urlencode(self.kwargs)}'
         return url
 
-    def run(self):
+    async def run(self):
         """
         Method that executes main query. Use start() to execute.
         """
-        response = super().run()
+        response = await super().run()
         self.done = False
         if not self.results:
             self.done = True
             return response
-        self._more_results = self.results[-1]['id_str']
+        self._next_cursor = self.results[-1]['id_str']
         last_return = self.kwargs.get('max_id')
-        if last_return and int(self._more_results) >= int(last_return):
+        if last_return and int(self._next_cursor) >= int(last_return):
             self.done = True
         return response
 
-    def save(self):
+    async def save(self):
         """
         Save the results of the query to disk.
         """
         if Config.full_user_mentions or DEFAULT_EXPAND_USERS:
             self.log('Expanding user mentions!')
-            CachedUserCentral.expand_user_mentions(self.results)
-        super(TimelineQuery, self).save()
+            await CachedUserCentral.expand_user_mentions(self.results)
+        await super(TimelineQuery, self).save()
 
 
 class StandardSearchQuery(TweetRequestQuery):
@@ -272,14 +272,14 @@ class StandardSearchQuery(TweetRequestQuery):
                 url += f'?{urllib.parse.urlencode(self.kwargs)}'
         return url
 
-    def save(self):
+    async def save(self):
         """
         Save the results of the query to disk.
         """
         if Config.full_user_mentions or DEFAULT_EXPAND_USERS:
             self.log('Expanding user mentions!')
-            CachedUserCentral.expand_user_mentions(self.results)
-        super(StandardSearchQuery, self).save()
+            await CachedUserCentral.expand_user_mentions(self.results)
+        await super(StandardSearchQuery, self).save()
 
 
 class FullArchiveGetQuery(TweetRequestQuery):

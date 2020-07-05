@@ -31,6 +31,9 @@ class ResultType(Enum):
     User = 2
 
 
+API_BASE_URL = 'https://api.twitter.com/1.1'
+TOKEN_ENDPOINT = 'https://api.twitter.com/oauth2/token'
+
 DEFAULT_PROJECT_DIR = os.getcwd()
 DEFAULT_OUTPUT_EXTENSION = '.zip'
 

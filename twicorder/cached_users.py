@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from datetime import datetime, timedelta
-from threading import Lock
+from asyncio import Lock
 
 from twicorder.utils import collect_key_values
 from twicorder.config import Config
@@ -135,7 +135,7 @@ class CachedUserCentral:
         }
 
     @classmethod
-    def expand_user_mentions(cls, tweets):
+    async def expand_user_mentions(cls, tweets):
         """
         Expands user mentions for tweets in result. Performs API user lookup if
         no data is found for the given mention.
@@ -166,7 +166,7 @@ class CachedUserCentral:
                 missing_users[i:i + n] for i in range(0, len(missing_users), n)
             ]
             for chunk in chunks:
-                UserQuery(user_id=','.join([str(u) for u in chunk])).start()
+                await UserQuery(user_id=','.join([str(u) for u in chunk])).start()
             for tweet in tweets:
                 mention_sections = collect_key_values('user_mentions', tweet)
                 for mention_section in mention_sections:

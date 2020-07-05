@@ -2,9 +2,8 @@
 # -*- coding: utf-8 -*-
 
 import os
-import sqlite3
 
-from threading import Lock
+import aiosqlite
 
 from twicorder.config import Config
 
@@ -16,20 +15,14 @@ class AppData:
 
     if not os.path.exists(Config.appdata_dir):
         os.makedirs(Config.appdata_dir)
-    _con = sqlite3.connect(
-        Config.appdata,
-        check_same_thread=False,
-        timeout=float(Config.appdata_timeout)
-    )
-    _lock = Lock()
-
-    def __del__(self):
-        self._con.close()
 
     @classmethod
-    def _make_query_table(cls, name):
-        with cls._lock, cls._con as con:
-            con.execute(
+    async def _make_query_table(cls, name):
+        async with aiosqlite.connect(
+            Config.appdata,
+            timeout=float(Config.appdata_timeout)
+        ) as db:
+            await db.execute(
                 f'''
                 CREATE TABLE IF NOT EXISTS [{name}] (
                     object_id INTEGER PRIMARY KEY,
@@ -39,9 +32,12 @@ class AppData:
             )
 
     @classmethod
-    def _make_last_id_table(cls):
-        with cls._lock, cls._con as con:
-            con.execute(
+    async def _make_last_id_table(cls):
+        async with aiosqlite.connect(
+            Config.appdata,
+            timeout=float(Config.appdata_timeout)
+        ) as db:
+            await db.execute(
                 '''
                 CREATE TABLE IF NOT EXISTS queries_last_id (
                     query_hash TEXT PRIMARY KEY,
@@ -51,10 +47,13 @@ class AppData:
             )
 
     @classmethod
-    def add_query_object(cls, query_name, object_id, timestamp):
-        cls._make_query_table(query_name)
-        with cls._lock, cls._con as con:
-            con.execute(
+    async def add_query_object(cls, query_name, object_id, timestamp):
+        await cls._make_query_table(query_name)
+        async with aiosqlite.connect(
+            Config.appdata,
+            timeout=float(Config.appdata_timeout)
+        ) as db:
+            await db.execute(
                 f'''
                 INSERT OR REPLACE INTO {query_name} VALUES (
                     ?, ?
@@ -64,10 +63,13 @@ class AppData:
             )
 
     @classmethod
-    def add_query_objects(cls, query_name, objects):
-        cls._make_query_table(query_name)
-        with cls._lock, cls._con as con:
-            con.executemany(
+    async def add_query_objects(cls, query_name, objects):
+        await cls._make_query_table(query_name)
+        async with aiosqlite.connect(
+            Config.appdata,
+            timeout=float(Config.appdata_timeout)
+        ) as db:
+            await db.executemany(
                 f'''
                 INSERT OR REPLACE INTO {query_name} VALUES (
                     ?, ?
@@ -77,11 +79,13 @@ class AppData:
             )
 
     @classmethod
-    def get_query_objects(cls, query_name):
-        cls._make_query_table(query_name)
-        with cls._lock, cls._con as con:
-            cursor = con.cursor()
-            cursor.execute(
+    async def get_query_objects(cls, query_name):
+        await cls._make_query_table(query_name)
+        async with aiosqlite.connect(
+            Config.appdata,
+            timeout=float(Config.appdata_timeout)
+        ) as db:
+            cursor = await db.execute(
                 f'''
                 SELECT DISTINCT
                     object_id, timestamp
@@ -89,13 +93,16 @@ class AppData:
                     {query_name}
                 '''
             )
-            return cursor.fetchall()
+            return await cursor.fetchall()
 
     @classmethod
-    def set_last_cursor(cls, query_hash, object_id):
-        cls._make_last_id_table()
-        with cls._lock, cls._con as con:
-            con.execute(
+    async def set_last_cursor(cls, query_hash, object_id):
+        await cls._make_last_id_table()
+        async with aiosqlite.connect(
+            Config.appdata,
+            timeout=float(Config.appdata_timeout)
+        ) as db:
+            await db.execute(
                 '''
                 INSERT OR REPLACE INTO queries_last_id VALUES (
                     ?, ?
@@ -105,11 +112,13 @@ class AppData:
             )
 
     @classmethod
-    def get_last_cursor(cls, query_hash):
-        cls._make_last_id_table()
-        with cls._lock, cls._con as con:
-            cursor = con.cursor()
-            cursor.execute(
+    async def get_last_cursor(cls, query_hash):
+        await cls._make_last_id_table()
+        async with aiosqlite.connect(
+            Config.appdata,
+            timeout=float(Config.appdata_timeout)
+        ) as db:
+            cursor = await db.execute(
                 '''
                 SELECT
                 DISTINCT
@@ -121,7 +130,7 @@ class AppData:
                 ''',
                 (query_hash,)
             )
-            result = cursor.fetchone()
+            result = await cursor.fetchone()
         if not result:
             return
         return result[0]

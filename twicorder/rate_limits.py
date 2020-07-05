@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from httpx import Headers
 from twicorder.constants import AuthMethod
 
 
@@ -18,14 +19,14 @@ class RateLimitCentral:
     }
 
     @classmethod
-    def update(cls, auth_method: AuthMethod, endpoint: str, header: dict):
+    def update(cls, auth_method: AuthMethod, endpoint: str, header: Headers):
         """
         Update endpoint with latest rate limit information.
 
         Args:
             auth_method (AuthMethod): Authentication method
-            endpoint (str): Endpoint
-            header (dict): Query response header
+            endpoint: Endpoint
+            header: Query response header
 
         """
         limit_keys = {
@@ -58,7 +59,7 @@ class RateLimitCentral:
         )
 
     @classmethod
-    def _load_rate_limits(cls, auth_method: AuthMethod):
+    async def _load_rate_limits(cls, auth_method: AuthMethod):
         """
         Load all rate limits.
 
@@ -69,7 +70,7 @@ class RateLimitCentral:
         from twicorder.queries.request_queries import RateLimitStatusQuery
         query = RateLimitStatusQuery()
         query.auth_method = auth_method
-        results = query.start()
+        results = await query.start()
         for resource, family in results['resources'].items():
             for endpoint, limit_data in family.items():
                 cls.insert(
@@ -79,7 +80,7 @@ class RateLimitCentral:
                 )
 
     @classmethod
-    def get(cls, auth_method: AuthMethod, endpoint: str):
+    async def get(cls, auth_method: AuthMethod, endpoint: str):
         """
         Retrieves latest rate limit information for the given endpoint.
         Args:
@@ -91,7 +92,7 @@ class RateLimitCentral:
 
         """
         if not cls._limits[auth_method].get(endpoint):
-            cls._load_rate_limits(auth_method)
+            await cls._load_rate_limits(auth_method)
         return cls._limits[auth_method].get(endpoint)
 
     @classmethod
