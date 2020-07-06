@@ -4,9 +4,9 @@
 import asyncio
 import copy
 import hashlib
+import httpx
 import json
 import os
-import requests
 import time
 import traceback
 import urllib
@@ -314,12 +314,12 @@ class BaseQuery:
         """
         raise NotImplementedError
 
-    async def finalise(self, response: requests.Response):
+    async def finalise(self, response: httpx.Response):
         """
         Method called immediately after the query runs.
 
         Args:
-            response (requests.Response): Response to query
+            response: Response to query
 
         """
         pass
@@ -689,12 +689,12 @@ class ProductionRequestQuery(BaseRequestQuery):
             self.log(msg)
             await asyncio.sleep(sleep_time)
 
-    async def finalise(self, response: requests.Response):
+    async def finalise(self, response: httpx.Response):
         """
         Method called immediately after the query runs.
 
         Args:
-            response (requests.Response): Response to query
+            response: Response to query
 
         """
         await super().finalise(response)
@@ -748,12 +748,12 @@ class TweetRequestQuery(ProductionRequestQuery):
         """
         return str(result['id'])
 
-    async def finalise(self, response: requests.Response):
+    async def finalise(self, response: httpx.Response):
         """
         Method called immediately after the query runs.
 
         Args:
-            response (requests.Response): Response to query
+            response: Response to query
 
         """
         await super().finalise(response)

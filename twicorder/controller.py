@@ -4,11 +4,9 @@
 import inspect
 import os
 import sys
-import time
 
 from asyncio import sleep
 
-from twicorder import TwicorderException
 from twicorder.config import Config
 from twicorder.logger import TwiLogger
 from twicorder.tasks import TaskManager
@@ -42,11 +40,14 @@ class Twicorder:
             sys.exit(0)
 
         # Test setup before continuing
-        try:
-            from twicorder.auth import AuthHandler
-            AuthHandler.token()
-        except TwicorderException as error:
-            logger.critical(error)
+        keys = {
+            Config.consumer_key,
+            Config.consumer_secret,
+            Config.access_token,
+            Config.access_secret
+        }
+        if not all(keys):
+            logger.critical('Login credentials not found')
             sys.exit(1)
 
         self._task_manager = TaskManager()

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import requests
+import httpx
 import urllib
 
 from twicorder.appdata import AppData
@@ -43,12 +43,12 @@ class UserLookupQuery(ProductionRequestQuery):
         self._kwargs['include_entities'] = 'true'
         self._kwargs.update(kwargs)
 
-    async def finalise(self, response: requests.Response):
+    async def finalise(self, response: httpx.Response):
         """
         Method called immediately after the query runs.
 
         Args:
-            response (requests.Response): Response to query
+            response: Response to query
 
         """
         await super().finalise(response)
@@ -116,12 +116,12 @@ class FollowerIDQuery(ProductionRequestQuery):
         """
         return str(result)
 
-    async def finalise(self, response: requests.Response):
+    async def finalise(self, response: httpx.Response):
         """
         Method called immediately after the query runs.
 
         Args:
-            response (requests.Response): Response to query
+            response: Response to query
 
         """
         await super().finalise(response)

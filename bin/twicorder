@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import asyncio
 import asyncclick as click
 import faulthandler
 import sys
 import traceback
+
+from concurrent.futures import ThreadPoolExecutor
 
 from twicorder.constants import (
     DEFAULT_EXPAND_USERS_INTERVAL,
@@ -93,6 +96,9 @@ async def run(ctx: click.Context, consumer_key: str, consumer_secret: str,
     """
     Start crawler
     """
+    loop = asyncio.get_event_loop()
+    loop.set_default_executor(ThreadPoolExecutor(max_workers=8))
+
     from twicorder import config
     config.load(
         consumer_key=consumer_key,

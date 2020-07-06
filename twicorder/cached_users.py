@@ -147,32 +147,32 @@ class CachedUserCentral:
             list[dict]: List of tweets with expanded user mentions
 
         """
-        with cls.lock:
-            cls.filter()
-            missing_users = set([])
-            for tweet in tweets:
-                for user in collect_key_values('user', tweet):
-                    cls.add(user)
-                mention_sections = collect_key_values('user_mentions', tweet)
-                for mention_section in mention_sections:
-                    for mention in mention_section:
-                        if not mention['id'] in cls.users:
-                            missing_users.add(mention['id'])
-            if not missing_users:
-                return
-            missing_users = list(missing_users)
-            n = 100
-            chunks = [
-                missing_users[i:i + n] for i in range(0, len(missing_users), n)
-            ]
-            for chunk in chunks:
-                await UserQuery(user_id=','.join([str(u) for u in chunk])).start()
-            for tweet in tweets:
-                mention_sections = collect_key_values('user_mentions', tweet)
-                for mention_section in mention_sections:
-                    for mention in mention_section:
-                        full_user = cls.users.get(mention['id'])
-                        if not full_user:
-                            continue
-                        mention.update(full_user.data)
+        # with cls.lock:
+        cls.filter()
+        missing_users = set([])
+        for tweet in tweets:
+            for user in collect_key_values('user', tweet):
+                cls.add(user)
+            mention_sections = collect_key_values('user_mentions', tweet)
+            for mention_section in mention_sections:
+                for mention in mention_section:
+                    if not mention['id'] in cls.users:
+                        missing_users.add(mention['id'])
+        if not missing_users:
+            return
+        missing_users = list(missing_users)
+        n = 100
+        chunks = [
+            missing_users[i:i + n] for i in range(0, len(missing_users), n)
+        ]
+        for chunk in chunks:
+            await UserQuery(user_id=','.join([str(u) for u in chunk])).start()
+        for tweet in tweets:
+            mention_sections = collect_key_values('user_mentions', tweet)
+            for mention_section in mention_sections:
+                for mention in mention_section:
+                    full_user = cls.users.get(mention['id'])
+                    if not full_user:
+                        continue
+                    mention.update(full_user.data)
         return tweets
