@@ -5,11 +5,15 @@ import inspect
 import os
 import sys
 
+import aiosqlite
+
 from asyncio import sleep
 
+from twicorder.appdata import AppData
 from twicorder.config import Config
 from twicorder.logger import TwiLogger
-from twicorder.tasks import TaskManager
+from twicorder.queries.base import BaseQuery
+from twicorder.tasks import Task, TaskManager
 
 logger = TwiLogger()
 
@@ -103,12 +107,14 @@ class Twicorder:
         """
         self._running = False
 
-    async def run(self):
+    async def run(self, db: aiosqlite.Connection):
         """
         Starts crawler.
         """
         self._running = True
+        from twicorder.appdata import AppData
         from twicorder.exchange import QueryExchange
+        app_data = AppData(db=db)
         logger.info(' Loading tasks '.center(80, '='))
         logger.info('')
         slept = 0
@@ -124,7 +130,7 @@ class Twicorder:
                         if not task.due:
                             continue
                         update = True
-                        query = self.cast_query(task)
+                        query = self.cast_query(app_data, task)
                         # Todo: Finish callback logic!
                         QueryExchange.add(query, self.on_query_result)
                         logger.info(query)
@@ -144,20 +150,20 @@ class Twicorder:
             logger.info('=' * 80 + '\n')
         await QueryExchange.join_wait()
 
-    def cast_query(self, task):
+    def cast_query(self, app_data: AppData, task: Task) -> BaseQuery:
         """
         Casts the given task to a query.
 
         Args:
-            task (twicorder.tasks.Task): Task
+            app_data: AppData object for persistent storage between sessions
+            task: Task
 
         Returns:
-            twicorder.queries.BaseQuery: Query
-
+            Query object
 
         """
         query_object = self.query_types[task.name]
-        query = query_object(task.output, **task.kwargs)
+        query = query_object(app_data, task.output, **task.kwargs)
         task.add_query(query)
         print(f'Task name: {task.name}, remaining: {task.remaining}')
         # task.checkout()

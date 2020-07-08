@@ -4,8 +4,10 @@
 import asyncio
 import asyncclick as click
 import faulthandler
+import os
 import sys
-import traceback
+
+import aiosqlite
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -114,12 +116,21 @@ async def run(ctx: click.Context, consumer_key: str, consumer_secret: str,
         user_lookup_interval=user_lookup_interval,
         appdata_timeout=appdata_timeout
     )
+    from twicorder.config import Config
+    from twicorder.logger import TwiLogger
     from twicorder.controller import Twicorder
+    logger = TwiLogger()
     twicorder = Twicorder()
     try:
-        await twicorder.run()
+        if not os.path.exists(Config.appdata_dir):
+            os.makedirs(Config.appdata_dir)
+        async with aiosqlite.connect(
+                Config.appdata,
+                timeout=float(Config.appdata_timeout)
+        ) as db:
+            await twicorder.run(db=db)
     except Exception:
-        click.echo(traceback.format_exc())
+        logger.exception('Twicorder encountered an error and quit:\n')
         sys.exit(1)
 
 
@@ -127,4 +138,5 @@ if __name__ == '__main__':
     try:
         cli(_anyio_backend='asyncio', auto_envvar_prefix='TWICORDER')
     except KeyboardInterrupt:
+        click.echo('Twicorder was terminated on request')
         sys.exit(0)

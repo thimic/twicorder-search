@@ -29,12 +29,20 @@ async def worker(name: str, queue: Queue, on_result: Optional[Callable] = None):
                 f'Terminated worker "{name}" after tombstone query.'
             )
             break
+        try_count = 0
         while not query.done:
             try:
                 await query.start()
             except Exception:
-                logger.exception('Query failed:\n')
-                break
+                logger.exception(f'Query {query!r} failed:\n')
+                # If the query failed, try 5 more times with increasing wait
+                # times before giving up.
+                try_count += 1
+                if try_count <= 5:
+                    await sleep(2 ^ try_count)
+                    continue
+                else:
+                    break
             if on_result:
                 await on_result(query)
             logger.info(query.fetch_log())

@@ -37,8 +37,9 @@ class UserLookupQuery(ProductionRequestQuery):
     name = 'user_lookups'
     endpoint = '/users/lookup'
 
-    def __init__(self, output=None, max_count=0, **kwargs):
-        super().__init__(output, max_count, **kwargs)
+    def __init__(self, app_data: AppData, output: str = None,
+                 max_count: int = 0, **kwargs):
+        super().__init__(app_data, output, max_count, **kwargs)
         self._kwargs['tweet_mode'] = 'extended'
         self._kwargs['include_entities'] = 'true'
         self._kwargs.update(kwargs)
@@ -81,8 +82,9 @@ class FollowerIDQuery(ProductionRequestQuery):
     _next_cursor_path = 'next_cursor'
     _cursor_key = 'cursor'
 
-    def __init__(self, output=None, max_count=0, **kwargs):
-        super().__init__(output, max_count, **kwargs)
+    def __init__(self, app_data: AppData, output: str = None,
+                 max_count: int = 0, **kwargs):
+        super().__init__(app_data, output, max_count, **kwargs)
         self._kwargs['count'] = '5000'
         self._kwargs.update(kwargs)
 
@@ -135,7 +137,7 @@ class FollowerIDQuery(ProductionRequestQuery):
         # this tweet.
         if self._done and self.last_cursor:
             self.log(f'Cached ID of last tweet returned by query to disk.')
-            await AppData.set_last_cursor(self.uid, self.last_cursor)
+            await self.app_data.set_last_cursor(self.uid, self.last_cursor)
 
 
 class StatusQuery(TweetRequestQuery):
@@ -143,8 +145,9 @@ class StatusQuery(TweetRequestQuery):
     name = 'status'
     endpoint = '/statuses/lookup'
 
-    def __init__(self, output=None, max_count=0, **kwargs):
-        super().__init__(output, max_count, **kwargs)
+    def __init__(self, app_data: AppData, output: str = None,
+                 max_count: int = 0, **kwargs):
+        super().__init__(app_data, output, max_count, **kwargs)
         self._kwargs['tweet_mode'] = 'extended'
         self._kwargs['include_entities'] = 'true'
         self._kwargs['trim_user'] = 'false'
@@ -182,8 +185,9 @@ class TimelineQuery(TweetRequestQuery):
     endpoint = '/statuses/user_timeline'
     _cursor_key = 'since_id'
 
-    def __init__(self, output=None, max_count=0, **kwargs):
-        super().__init__(output, max_count, **kwargs)
+    def __init__(self, app_data: AppData, output: str = None,
+                 max_count: int = 0, **kwargs):
+        super().__init__(app_data, output, max_count, **kwargs)
         self._kwargs['tweet_mode'] = 'extended'
         self._kwargs['result_type'] = 'recent'
         self._kwargs['count'] = 200
@@ -230,7 +234,10 @@ class TimelineQuery(TweetRequestQuery):
         """
         if Config.full_user_mentions or DEFAULT_EXPAND_USERS:
             self.log('Expanding user mentions!')
-            await CachedUserCentral.expand_user_mentions(self.results)
+            await CachedUserCentral.expand_user_mentions(
+                self.app_data,
+                self.results
+            )
         await super(TimelineQuery, self).save()
 
 
@@ -242,8 +249,9 @@ class StandardSearchQuery(TweetRequestQuery):
     _results_path = 'statuses'
     _next_cursor_path = 'search_metadata.next_results'
 
-    def __init__(self, output=None, max_count=0, **kwargs):
-        super().__init__(output, max_count, **kwargs)
+    def __init__(self, app_data: AppData, output: str = None,
+                 max_count: int = 0, **kwargs):
+        super().__init__(app_data, output, max_count, **kwargs)
         self._kwargs['tweet_mode'] = 'extended'
         self._kwargs['result_type'] = 'recent'
         self._kwargs['count'] = 100
@@ -278,7 +286,10 @@ class StandardSearchQuery(TweetRequestQuery):
         """
         if Config.full_user_mentions or DEFAULT_EXPAND_USERS:
             self.log('Expanding user mentions!')
-            await CachedUserCentral.expand_user_mentions(self.results)
+            await CachedUserCentral.expand_user_mentions(
+                self.app_data,
+                self.results
+            )
         await super(StandardSearchQuery, self).save()
 
 

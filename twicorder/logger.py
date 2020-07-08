@@ -6,7 +6,6 @@ import os
 import sys
 
 from logging import StreamHandler
-
 from logging.handlers import RotatingFileHandler
 
 from twicorder.config import Config

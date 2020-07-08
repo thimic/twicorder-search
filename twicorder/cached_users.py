@@ -3,11 +3,13 @@
 
 from datetime import datetime, timedelta
 from asyncio import Lock
+from typing import Iterable
 
-from twicorder.utils import collect_key_values
+from twicorder.appdata import AppData
 from twicorder.config import Config
 from twicorder.constants import DEFAULT_EXPAND_USERS_INTERVAL
 from twicorder.queries import ProductionRequestQuery
+from twicorder.utils import collect_key_values
 
 
 class UserQuery(ProductionRequestQuery):
@@ -15,8 +17,9 @@ class UserQuery(ProductionRequestQuery):
     name = 'cached_user'
     endpoint = '/users/lookup'
 
-    def __init__(self, output=None, **kwargs):
-        super(UserQuery, self).__init__(output, **kwargs)
+    def __init__(self, app_data: AppData, output: str = None,
+                 max_count: int = 0, **kwargs):
+        super(UserQuery, self).__init__(app_data, output, max_count, **kwargs)
         self._kwargs['tweet_mode'] = 'extended'
         self._kwargs['include_entities'] = 'true'
         self._kwargs.update(kwargs)
@@ -135,12 +138,13 @@ class CachedUserCentral:
         }
 
     @classmethod
-    async def expand_user_mentions(cls, tweets):
+    async def expand_user_mentions(cls, app_data: AppData, tweets: Iterable):
         """
         Expands user mentions for tweets in result. Performs API user lookup if
         no data is found for the given mention.
 
         Args:
+            app_data: AppData object for persistent storage between sessions
             tweets (list[dict]): List of tweets
 
         Returns:
@@ -166,7 +170,7 @@ class CachedUserCentral:
             missing_users[i:i + n] for i in range(0, len(missing_users), n)
         ]
         for chunk in chunks:
-            await UserQuery(user_id=','.join([str(u) for u in chunk])).start()
+            await UserQuery(app_data, user_id=','.join([str(u) for u in chunk])).start()
         for tweet in tweets:
             mention_sections = collect_key_values('user_mentions', tweet)
             for mention_section in mention_sections:

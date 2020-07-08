@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os
-
 import aiosqlite
-
-from twicorder.config import Config
 
 
 class AppData:
@@ -13,127 +9,92 @@ class AppData:
     Class for reading and writing AppData to be used between sessions.
     """
 
-    if not os.path.exists(Config.appdata_dir):
-        os.makedirs(Config.appdata_dir)
+    def __init__(self, db: aiosqlite.Connection):
+        self._db = db
 
-    @classmethod
-    async def _make_query_table(cls, name):
-        async with aiosqlite.connect(
-            Config.appdata,
-            timeout=float(Config.appdata_timeout)
-        ) as db:
-            await db.execute(
-                f'''
-                CREATE TABLE IF NOT EXISTS [{name}] (
-                    object_id INTEGER PRIMARY KEY,
-                    timestamp INTEGER NOT NULL
-                )
-                '''
-            )
+    @property
+    def db(self) -> aiosqlite.Connection:
+        """
+        Database connection.
 
-    @classmethod
-    async def _make_last_id_table(cls):
-        async with aiosqlite.connect(
-            Config.appdata,
-            timeout=float(Config.appdata_timeout)
-        ) as db:
-            await db.execute(
-                '''
-                CREATE TABLE IF NOT EXISTS queries_last_id (
-                    query_hash TEXT PRIMARY KEY,
-                    object_id INTEGER NOT NULL
-                )
-                '''
-            )
-            await db.commit()
+        Returns:
+            Database connection object
 
-    @classmethod
-    async def add_query_object(cls, query_name, object_id, timestamp):
-        await cls._make_query_table(query_name)
-        async with aiosqlite.connect(
-            Config.appdata,
-            timeout=float(Config.appdata_timeout)
-        ) as db:
-            await db.execute(
-                f'''
-                INSERT OR REPLACE INTO {query_name} VALUES (
-                    ?, ?
-                )
-                ''',
-                (object_id, timestamp)
-            )
-            await db.commit()
+        """
+        return self._db
 
-    @classmethod
-    async def add_query_objects(cls, query_name, objects):
-        await cls._make_query_table(query_name)
-        async with aiosqlite.connect(
-            Config.appdata,
-            timeout=float(Config.appdata_timeout)
-        ) as db:
-            await db.executemany(
-                f'''
-                INSERT OR REPLACE INTO {query_name} VALUES (
-                    ?, ?
-                )
-                ''',
-                objects
+    async def _make_query_table(self, name):
+        query = f'''
+            CREATE TABLE IF NOT EXISTS [{name}] (
+                object_id INTEGER PRIMARY KEY,
+                timestamp INTEGER NOT NULL
             )
-            await db.commit()
+            '''
+        await self.db.execute(query)
 
-    @classmethod
-    async def get_query_objects(cls, query_name):
-        await cls._make_query_table(query_name)
-        async with aiosqlite.connect(
-            Config.appdata,
-            timeout=float(Config.appdata_timeout)
-        ) as db:
-            cursor = await db.execute(
-                f'''
-                SELECT DISTINCT
-                    object_id, timestamp
-                FROM
-                    {query_name}
-                '''
+    async def _make_last_id_table(self):
+        query = '''
+            CREATE TABLE IF NOT EXISTS queries_last_id (
+                query_hash TEXT PRIMARY KEY,
+                object_id INTEGER NOT NULL
             )
+            '''
+        await self.db.execute(query)
+        await self.db.commit()
+
+    async def add_query_object(self, query_name, object_id, timestamp):
+        await self._make_query_table(query_name)
+        query = f'''
+            INSERT OR REPLACE INTO {query_name} VALUES (
+                ?, ?
+            )
+            '''
+        await self.db.execute(query, (object_id, timestamp))
+        await self.db.commit()
+
+    async def add_query_objects(self, query_name, objects):
+        await self._make_query_table(query_name)
+        query = f'''
+            INSERT OR REPLACE INTO {query_name} VALUES (
+                ?, ?
+            )
+            '''
+        await self.db.executemany(query, objects)
+        await self.db.commit()
+
+    async def get_query_objects(self, query_name):
+        await self._make_query_table(query_name)
+        query = f'''
+            SELECT DISTINCT
+                object_id, timestamp
+            FROM
+                {query_name}
+            '''
+        async with self.db.execute(query) as cursor:
             return await cursor.fetchall()
 
-    @classmethod
-    async def set_last_cursor(cls, query_hash, object_id):
-        await cls._make_last_id_table()
-        async with aiosqlite.connect(
-            Config.appdata,
-            timeout=float(Config.appdata_timeout)
-        ) as db:
-            await db.execute(
-                '''
-                INSERT OR REPLACE INTO queries_last_id VALUES (
-                    ?, ?
-                )
-                ''',
-                (query_hash, object_id)
+    async def set_last_cursor(self, query_hash, object_id):
+        await self._make_last_id_table()
+        query = '''
+            INSERT OR REPLACE INTO queries_last_id VALUES (
+                ?, ?
             )
-            await db.commit()
+            '''
+        await self.db.execute(query, (query_hash, object_id))
+        await self.db.commit()
 
-    @classmethod
-    async def get_last_cursor(cls, query_hash):
-        await cls._make_last_id_table()
-        async with aiosqlite.connect(
-            Config.appdata,
-            timeout=float(Config.appdata_timeout)
-        ) as db:
-            cursor = await db.execute(
-                '''
-                SELECT
-                DISTINCT
-                    object_id
-                FROM
-                    queries_last_id
-                WHERE
-                    query_hash=?
-                ''',
-                (query_hash,)
-            )
+    async def get_last_cursor(self, query_hash):
+        await self._make_last_id_table()
+        query = '''
+            SELECT
+            DISTINCT
+                object_id
+            FROM
+                queries_last_id
+            WHERE
+                query_hash=?
+            '''
+        async with self.db.execute(query, (query_hash,)) as cursor:
             result = await cursor.fetchone()
         if not result:
             return

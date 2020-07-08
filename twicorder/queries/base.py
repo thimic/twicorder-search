@@ -44,16 +44,19 @@ class BaseQuery:
     _mongo_collection = None
     _mongo_support = False
 
-    def __init__(self, output=None, max_count=0, **kwargs):
+    def __init__(self, app_data: AppData, output: str = None,
+                 max_count: int = 0, **kwargs):
         """
         BaseQuery constructor.
 
         Args:
-            output (str): Output directory, relative to project directory
-            max_count (int): Max results to query
-            **kwargs (dict): Keyword arguments for building the query url
+            app_data: AppData object for persistent storage between sessions
+            output: Output directory, relative to project directory
+            max_count: Max results to query
+            **kwargs: Keyword arguments for building the query url
 
         """
+        self._app_data = app_data
         self._done = False
         self._max_count = max_count
         self._next_cursor = None
@@ -75,6 +78,13 @@ class BaseQuery:
 
     def __str__(self):
         return f'{self.endpoint}\n{"-" * 80}\n{yaml.dump(self.kwargs)}'
+
+    @property
+    def app_data(self):
+        """
+        AppData object for persistent storage between sessions.
+        """
+        return self._app_data
 
     @property
     def output(self) -> Optional[str]:
@@ -304,7 +314,7 @@ class BaseQuery:
         """
         Method called immediately before the query runs.
         """
-        last_cursor = await AppData.get_last_cursor(self.uid)
+        last_cursor = await self.app_data.get_last_cursor(self.uid)
         if last_cursor:
             self.kwargs[self.cursor_key] = last_cursor
 
@@ -431,7 +441,7 @@ class BaseQuery:
         """
 
         # Loading picked tweet IDs
-        results = dict(await AppData.get_query_objects(self.name)) or {}
+        results = dict(await self.app_data.get_query_objects(self.name)) or {}
 
         # Purging tweet IDs older than 14 days
         now = datetime.now()
@@ -448,7 +458,7 @@ class BaseQuery:
         for result in self.results:
             timestamp = self.result_timestamp(result)
             new_results.append((result['id'], int(timestamp.timestamp())))
-        await AppData.add_query_objects(self.name, new_results)
+        await self.app_data.add_query_objects(self.name, new_results)
 
 
 class BaseRequestQuery(BaseQuery):
@@ -468,8 +478,9 @@ class BaseRequestQuery(BaseQuery):
         '_base_url',
     ]
 
-    def __init__(self, output=None, max_count=0, **kwargs):
-        super().__init__(output, max_count, **kwargs)
+    def __init__(self, app_data: AppData, output: str = None,
+                 max_count: int = 0, **kwargs):
+        super().__init__(app_data, output, max_count, **kwargs)
 
     def __eq__(self, other):
         return type(self) == type(other) and self.uid == other.uid
@@ -665,7 +676,11 @@ class ProductionRequestQuery(BaseRequestQuery):
 
         # Loop over available auth methods to check for rate limits
         for auth_method in self.auth_methods:
-            limit = await RateLimitCentral.get(auth_method, self.endpoint)
+            limit = await RateLimitCentral.get(
+                app_data=self.app_data,
+                auth_method=auth_method,
+                endpoint=self.endpoint
+            )
             self.log(f'{auth_method.name}: {limit}')
 
             # If rate limit is in effect for this method, log it and try the
@@ -768,4 +783,4 @@ class TweetRequestQuery(ProductionRequestQuery):
         # this tweet.
         if self.last_cursor:
             self.log(f'Cached ID of last tweet returned by query to disk.')
-            await AppData.set_last_cursor(self.uid, self.last_cursor)
+            await self.app_data.set_last_cursor(self.uid, self.last_cursor)

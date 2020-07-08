@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 from datetime import datetime
 
 from httpx import Headers
+from twicorder.appdata import AppData
 from twicorder.constants import AuthMethod
 
 
@@ -59,16 +62,17 @@ class RateLimitCentral:
         )
 
     @classmethod
-    async def _load_rate_limits(cls, auth_method: AuthMethod):
+    async def _load_rate_limits(cls, app_data: AppData, auth_method: AuthMethod):
         """
         Load all rate limits.
 
         Args:
+            app_data: AppData object for persistent storage between sessions
             auth_method (AuthMethod): Authentication method
 
         """
         from twicorder.queries.request_queries import RateLimitStatusQuery
-        query = RateLimitStatusQuery()
+        query = RateLimitStatusQuery(app_data)
         query.auth_method = auth_method
         results = await query.start()
         for resource, family in results['resources'].items():
@@ -80,71 +84,80 @@ class RateLimitCentral:
                 )
 
     @classmethod
-    async def get(cls, auth_method: AuthMethod, endpoint: str):
+    async def get(cls, app_data: AppData, auth_method: AuthMethod,
+                  endpoint: str) -> RateLimit:
         """
         Retrieves latest rate limit information for the given endpoint.
+
         Args:
-            auth_method (AuthMethod): Authentication method
-            endpoint (str): Endpoint
+            app_data: AppData object for persistent storage between sessions
+            auth_method: Authentication method
+            endpoint: Endpoint
 
         Returns:
-            RateLimit: Rate limit object
+            Rate limit object
 
         """
         if not cls._limits[auth_method].get(endpoint):
-            await cls._load_rate_limits(auth_method)
+            await cls._load_rate_limits(app_data, auth_method)
         return cls._limits[auth_method].get(endpoint)
 
     @classmethod
-    def get_cap(cls, auth_method: AuthMethod, endpoint: str):
+    async def get_cap(cls, app_data: AppData, auth_method: AuthMethod,
+                      endpoint: str) -> Optional[int]:
         """
         Retrieve the query limit for the given endpoint.
 
         Args:
-            auth_method (AuthMethod): Authentication method
-            endpoint (str): Endpoint
+            app_data:
+            auth_method: Authentication method
+            endpoint: Endpoint
 
         Returns:
-            int: Max queries per 15 minutes
+            Max queries per 15 minutes
 
         """
-        limit = cls.get(auth_method, endpoint)
+        limit = await cls.get(app_data, auth_method, endpoint)
         if not limit:
             return
         return limit.cap
 
     @classmethod
-    def get_remaining(cls, auth_method: AuthMethod, endpoint: str):
+    async def get_remaining(cls, app_data: AppData, auth_method: AuthMethod,
+                            endpoint: str) -> Optional[int]:
         """
         Retrieve number of remaining queries for the given endpoint.
 
         Args:
-            auth_method (AuthMethod): Authentication method
-            endpoint (str): Endpoint
+            app_data: AppData object for persistent storage between sessions
+            auth_method: Authentication method
+            endpoint: Endpoint
 
         Returns:
-            int: Remaining queries for the current 15 minute window
+            Remaining queries for the current 15 minute window
 
         """
-        limit = cls.get(auth_method, endpoint)
+        limit = await cls.get(app_data, auth_method, endpoint)
         if not limit:
             return
         return limit.remaining
 
     @classmethod
-    def get_reset(cls, auth_method: AuthMethod, endpoint: str):
+    async def get_reset(cls, app_data: AppData, auth_method: AuthMethod,
+                        endpoint: str) -> Optional[float]:
         """
         Retrieve time until the current 15 minute window expires.
 
         Args:
-            auth_method (AuthMethod): Authentication method
-            endpoint (str): Endpoint
+            app_data: AppData object for persistent storage between sessions
+            auth_method: Authentication method
+            endpoint: Endpoint
 
         Returns:
-            float: Time in seconds
+            Time in seconds to reset
 
         """
-        limit = cls.get(auth_method, endpoint)
+        limit = await cls.get(app_data, auth_method, endpoint)
         if not limit:
             return
         return limit.reset
