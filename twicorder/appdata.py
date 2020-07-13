@@ -75,6 +75,9 @@ class AppData:
 
     async def set_last_cursor(self, query_hash, object_id):
         await self._make_last_id_table()
+        last_cursor = await self.get_last_cursor(query_hash)
+        if all([object_id, last_cursor]) and object_id <= last_cursor:
+            return
         query = '''
             INSERT OR REPLACE INTO queries_last_id VALUES (
                 ?, ?

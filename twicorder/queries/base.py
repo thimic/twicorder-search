@@ -1,33 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import asyncio
 import copy
-import hashlib
 import httpx
 import json
 import os
-import time
 import traceback
-import urllib
 import yaml
 
 from datetime import datetime, timedelta
 
 from twicorder.appdata import AppData
-from twicorder.aio_auth import AsyncAuthHandler
 from twicorder.config import Config
 from twicorder.constants import (
-    AuthMethod,
     DEFAULT_OUTPUT_EXTENSION,
-    RequestMethod,
     ResultType,
-    TW_TIME_FORMAT
 )
-from twicorder.rate_limits import RateLimitCentral
 from twicorder.utils import write, timestamp_to_datetime
 
-from typing import Set, Optional, Iterable
+from typing import Optional, Iterable
 
 
 class BaseQuery:
@@ -67,6 +58,7 @@ class BaseQuery:
         self._output = output
         self._kwargs = kwargs
         self._orig_kwargs = copy.deepcopy(kwargs)
+        self._setup_complete = False
         self._log = []
 
     def __eq__(self, other):
@@ -314,9 +306,12 @@ class BaseQuery:
         """
         Method called immediately before the query runs.
         """
+        if self._setup_complete:
+            return
         last_cursor = await self.app_data.get_last_cursor(self.uid)
         if last_cursor:
             self.kwargs[self.cursor_key] = last_cursor
+        self._setup_complete = True
 
     async def run(self):
         """
@@ -459,328 +454,3 @@ class BaseQuery:
             timestamp = self.result_timestamp(result)
             new_results.append((result['id'], int(timestamp.timestamp())))
         await self.app_data.add_query_objects(self.name, new_results)
-
-
-class BaseRequestQuery(BaseQuery):
-    """
-    Queries based on the requests module and the twitter API.
-    """
-    _base_url = 'https://api.twitter.com/1.1'
-    _request_method = RequestMethod.Get
-    _auth_methods = {AuthMethod.App, AuthMethod.User}
-    _auth_method = AuthMethod.App
-
-    _hash_keys = [
-        'endpoint',
-        '_results_path',
-        '_next_cursor_path',
-        '_orig_kwargs',
-        '_base_url',
-    ]
-
-    def __init__(self, app_data: AppData, output: str = None,
-                 max_count: int = 0, **kwargs):
-        super().__init__(app_data, output, max_count, **kwargs)
-
-    def __eq__(self, other):
-        return type(self) == type(other) and self.uid == other.uid
-
-    @property
-    def base_url(self) -> str:
-        """
-        Base API url for all queries.
-
-        Returns:
-            str: API url
-
-        """
-        return self._base_url
-
-    @property
-    def request_method(self) -> RequestMethod:
-        """
-        Http request method, such as 'GET' and 'POST'.
-
-        Returns:
-            RequestMethod: Request method
-
-        """
-        return self._request_method
-
-    @property
-    def auth_method(self) -> AuthMethod:
-        """
-        Twitter API authentication method currently in use. Either App or User
-        authentication.
-
-        Returns:
-            AuthMethod: App or User auth
-
-        """
-        return self._auth_method
-
-    @auth_method.setter
-    def auth_method(self, auth_method: AuthMethod):
-        """
-        Twitter API authentication method currently in use. Either App or User
-        authentication.
-
-        Args:
-            auth_method (AuthMethod): App or User auth
-
-        """
-        self._auth_method = auth_method
-
-    @property
-    def auth_methods(self) -> Set[AuthMethod]:
-        """
-        Available Twitter API authentication methods for this query. Defaults to
-        both App and User.
-
-        Returns:
-            set[AuthMethod]: Set of authentication methods
-
-        """
-        return self._auth_methods
-
-    @property
-    def request_url(self) -> str:
-        """
-        Fully formatted request url constructed from base API url, end point and
-        keyword arguments.
-
-        Returns:
-            str: Constructed request url
-
-        """
-        url = f'{self.base_url}{self.endpoint}.json'
-        if self.request_method is RequestMethod.Get:
-            if self.kwargs:
-                url += f'?{urllib.parse.urlencode(self.kwargs)}'
-        return url
-
-    @property
-    def uid(self) -> str:
-        """
-        Unique identifier for this query.
-
-        Returns:
-            str: Unique identifier
-
-        """
-        hash_str = str([getattr(self, k) for k in self._hash_keys]).encode()
-        return hashlib.blake2s(hash_str).hexdigest()
-
-    async def setup(self):
-        """
-        Method called immediately before the query runs.
-        """
-        # Purging logs
-        self._log = []
-
-    async def run(self):
-        """
-        Method that executes main query. Use start() to execute.
-        """
-
-        self.log(f'URL: {self.request_url}')
-        self.log(f'Method: {self.request_method.name}')
-        self.log(f'Auth: {self.auth_method.name}')
-
-        # Perform query
-        attempts = 0
-        while True:
-            try:
-                response = await AsyncAuthHandler.request(
-                    auth_method=self.auth_method,
-                    method=self.request_method,
-                    url=self.request_url,
-                )
-            except Exception as e:
-                self.log(f'Request failed: {e}')
-                import traceback
-                traceback.print_exc()
-                attempts += 1
-                await asyncio.sleep(2**attempts)
-                if attempts >= 5:
-                    raise
-            else:
-                break
-
-        # Check query response code. Return with error message if not a
-        # successful 200 code.
-        if response.status_code != 200:
-            if response.status_code == 429:
-                self.log(f'Rate Limit in effect: {response.reason_phrase}')
-                self.log(f'Message: {response.json().get("message")}')
-                RateLimitCentral.insert(
-                    auth_method=self.auth_method,
-                    endpoint=self.endpoint,
-                    limit=0,
-                    remaining=0,
-                    reset=datetime.now().timestamp() + 60
-                )
-            else:
-                self.log(
-                    '<{r.status_code}> {r.reason_phrase}: {r.text}'
-                    .format(r=response)
-                )
-            return response
-        self.log('Successful return!')
-
-        # Search query response for additional paged results. Pronounce the
-        # query done if no more pages are found.
-        cursor = response.json().copy()
-        if self.next_cursor_path:
-            for token in self.next_cursor_path.split('.'):
-                cursor = cursor.get(token, {})
-            if cursor:
-                self._next_cursor = cursor
-                self.log('More pages found!')
-            else:
-                self._next_cursor = None
-                self._done = True
-                self.log('No more pages!')
-        else:
-            self._done = True
-
-        # Extract crawled tweets from query response.
-        self._response_data = response.json()
-        results = response.json().copy()
-        if self.results_path:
-            for token in self.results_path.split('.'):
-                results = results.get(token, [])
-        self._results = results
-        self._result_count += len(results)
-        if self._max_count and self._result_count >= self._max_count:
-            self._done = True
-        self.log(f'Result count: {len(results)}')
-
-        # Returning crawled results
-        return response
-
-
-class ProductionRequestQuery(BaseRequestQuery):
-    """
-    Base class for production queries. These are queries that should have their
-    rate limits counted.
-    """
-
-    async def setup(self):
-        """
-        Method called immediately before the query runs.
-        """
-        await super().setup()
-        # Check rate limit for query. Sleep if limits are in effect.
-        limits = {}
-
-        # Loop over available auth methods to check for rate limits
-        for auth_method in self.auth_methods:
-            limit = await RateLimitCentral.get(
-                app_data=self.app_data,
-                auth_method=auth_method,
-                endpoint=self.endpoint
-            )
-            self.log(f'{auth_method.name}: {limit}')
-
-            # If rate limit is in effect for this method, log it and try the
-            # next one
-            if limit and limit.remaining == 0:
-                limits[auth_method] = limit
-            else:
-                self._auth_method = auth_method
-                break
-
-        # If all methods were logged, rate limits are in effect everywhere.
-        # Pick the auth method with the closest reset and wait.
-        if self.auth_methods and len(limits) == len(self.auth_methods):
-            shortest_wait = sorted(limits.items(), key=lambda x: x[1].reset)[0]
-            self._auth_method = shortest_wait[0]
-            sleep_time = max(shortest_wait[1].reset - time.time(), 0) + 2
-            msg = (
-                f'Sleeping for {sleep_time:.02f} seconds for endpoint '
-                f'"{self.endpoint}".'
-            )
-            self.log(msg)
-            await asyncio.sleep(sleep_time)
-
-    async def finalise(self, response: httpx.Response):
-        """
-        Method called immediately after the query runs.
-
-        Args:
-            response: Response to query
-
-        """
-        await super().finalise(response)
-
-        # Update rate limit for query
-        RateLimitCentral.update(
-            auth_method=self.auth_method,
-            endpoint=self.endpoint,
-            header=response.headers
-        )
-
-        # Save and store IDs for crawled tweets found in the query result.
-        # Also record the last tweet ID found.
-        if self.results:
-            # Todo: Save in callback! Don't bake IDs before successful save?
-            # await self.save()
-            pass
-
-
-class TweetRequestQuery(ProductionRequestQuery):
-    """
-    Base class for queries returning tweets.
-    """
-
-    _mongo_support = True
-
-    def result_timestamp(self, result):
-        """
-        For a given result produced by the current query, return its time stamp.
-
-        Args:
-            result (dict): One single result object
-
-        Returns:
-            datetime.datetime): Timestamp
-
-        """
-        created_at = result['created_at']
-        return datetime.strptime(created_at, TW_TIME_FORMAT)
-
-    def result_id(self, result: dict) -> str:
-        """
-        For a given result produced by the current query, return its ID.
-
-        Args:
-            result (dict): One single result object
-
-        Returns:
-            str: Result ID
-
-        """
-        return str(result['id'])
-
-    async def finalise(self, response: httpx.Response):
-        """
-        Method called immediately after the query runs.
-
-        Args:
-            response: Response to query
-
-        """
-        await super().finalise(response)
-        await self.bake_ids()
-        self.log(f'Cached {self.type.name} IDs to disk!')
-        if self.results:
-            self.last_cursor = self.results[0].get('id')
-
-        # Cache last tweet ID found to disk if the query, including all pages
-        # completed successfully. This saves us from searching all the way back
-        # to the beginning on next crawl. Instead we can stop when we encounter
-        # this tweet.
-        if self.last_cursor:
-            self.log(f'Cached ID of last tweet returned by query to disk.')
-            await self.app_data.set_last_cursor(self.uid, self.last_cursor)

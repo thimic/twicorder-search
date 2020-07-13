@@ -71,7 +71,7 @@ class RateLimitCentral:
             auth_method (AuthMethod): Authentication method
 
         """
-        from twicorder.queries.request_queries import RateLimitStatusQuery
+        from twicorder.queries.request.endpoints import RateLimitStatusQuery
         query = RateLimitStatusQuery(app_data)
         query.auth_method = auth_method
         results = await query.start()

@@ -28,7 +28,8 @@ async def worker(name: str, queue: Queue, on_result: Optional[Callable] = None):
             logger.debug(
                 f'Terminated worker "{name}" after tombstone query.'
             )
-            break
+            queue.task_done()
+            return
         try_count = 0
         while not query.done:
             try:
@@ -151,7 +152,6 @@ class QueryExchange:
         # Add tombstone to queues to cancel empty, blocking queues.
         for queue in cls.queues.values():
             await queue.put(None)
-            await queue.join()
 
         # Cancel our worker tasks.
         for task in cls.tasks.values():

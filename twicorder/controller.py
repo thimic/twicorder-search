@@ -93,8 +93,8 @@ class Twicorder:
         if self._query_types:
             return self._query_types
         from twicorder.queries import BaseRequestQuery
-        from twicorder.queries import request_queries
-        for name, item in inspect.getmembers(request_queries, inspect.isclass):
+        from twicorder.queries.request import endpoints
+        for name, item in inspect.getmembers(endpoints, inspect.isclass):
             if item == BaseRequestQuery:
                 continue
             elif issubclass(item, BaseRequestQuery):
