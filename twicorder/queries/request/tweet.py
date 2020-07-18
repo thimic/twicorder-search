@@ -17,7 +17,7 @@ class TweetRequestQuery(ProductionRequestQuery):
 
     _mongo_support = True
 
-    def result_timestamp(self, result):
+    def result_timestamp(self, result) -> datetime:
         """
         For a given result produced by the current query, return its time stamp.
 
@@ -55,15 +55,13 @@ class TweetRequestQuery(ProductionRequestQuery):
         await super().finalise(response)
         await self.bake_ids()
         self.log(f'Cached {self.type.name} IDs to disk!')
-        if self.results:
-            self.last_cursor = self.results[0].get('id')
 
         # Cache last tweet ID found to disk if the query, including all pages
         # completed successfully. This saves us from searching all the way back
         # to the beginning on next crawl. Instead we can stop when we encounter
         # this tweet.
-        if self.last_cursor:
-            self.log(f'Cached ID of last tweet returned by query to disk.')
+        if self.done and self.last_cursor:
+            self.log('Cached ID of most recent tweet to disk.')
             await self.app_data.set_last_cursor(self.uid, self.last_cursor)
 
     async def save(self):

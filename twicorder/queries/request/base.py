@@ -203,14 +203,17 @@ class BaseRequestQuery(BaseQuery):
                 self.log('No more pages!')
         else:
             self._done = True
+        self.log(f'Next cursor: {self._next_cursor}')
 
-        # Extract crawled tweets from query response.
+        # Extract data from query response.
         self._response_data = response.json()
         results = response.json().copy()
         if self.results_path:
             for token in self.results_path.split('.'):
                 results = results.get(token, [])
         self._results = results
+        if results and isinstance(results, list) and not self._last_cursor:
+            self._last_cursor = results[0].get('id')
         self._result_count += len(results)
         if self._max_count and self._result_count >= self._max_count:
             self._done = True

@@ -58,7 +58,6 @@ class BaseQuery:
         self._output = output
         self._kwargs = kwargs
         self._orig_kwargs = copy.deepcopy(kwargs)
-        self._setup_complete = False
         self._log = []
 
     def __eq__(self, other):
@@ -306,12 +305,9 @@ class BaseQuery:
         """
         Method called immediately before the query runs.
         """
-        if self._setup_complete:
-            return
         last_cursor = await self.app_data.get_last_cursor(self.uid)
         if last_cursor:
             self.kwargs[self.cursor_key] = last_cursor
-        self._setup_complete = True
 
     async def run(self):
         """
@@ -435,11 +431,11 @@ class BaseQuery:
         shouldn't encounter results older than 14 days very often.
         """
 
-        # Loading picked tweet IDs
+        # Loading pickled tweet IDs
         results = dict(await self.app_data.get_query_objects(self.name)) or {}
 
         # Purging tweet IDs older than 14 days
-        now = datetime.now()
+        now = datetime.utcnow()
         old_results = results.copy()
         results = {}
         for object_id, timestamp in old_results.items():
@@ -447,10 +443,11 @@ class BaseQuery:
             if not now - dt > timedelta(days=14):
                 results[object_id] = timestamp
 
-        # Stores tweet IDs from result
+        # Purging duplicates from results
         self._results = [r for r in self.results if r['id'] not in results]
+
+        # Stores tweet IDs from result
         new_results = []
         for result in self.results:
-            timestamp = self.result_timestamp(result)
-            new_results.append((result['id'], int(timestamp.timestamp())))
+            new_results.append((result['id'], int(now.timestamp())))
         await self.app_data.add_query_objects(self.name, new_results)

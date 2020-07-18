@@ -139,6 +139,7 @@ class Task:
         for query in self._queries:
             if query.done:
                 self._remaining -= 1
+                self._remaining = max(self._remaining, 0)
             else:
                 alive_queries.append(query)
         self._queries = alive_queries
