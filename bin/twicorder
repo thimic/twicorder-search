@@ -138,5 +138,35 @@ if __name__ == '__main__':
     try:
         cli(_anyio_backend='asyncio', auto_envvar_prefix='TWICORDER')
     except KeyboardInterrupt:
-        click.echo('Twicorder was terminated on request')
+
+        loop = asyncio.get_event_loop()
+
+        def exception_handler(loop: asyncio.AbstractEventLoop, context: dict):
+            """
+            Suppress CancelledError exceptions.
+
+            Args:
+                loop: Event loop
+                context: Exception context
+
+            """
+            exception = context.get('exception')
+            if exception and isinstance(exception, asyncio.CancelledError):
+                return
+            loop.default_exception_handler(context)
+
+        loop.set_exception_handler(exception_handler)
+
+        tasks = asyncio.gather(
+            *asyncio.all_tasks(loop=loop),
+            loop=loop,
+            return_exceptions=True
+        )
+        tasks.add_done_callback(lambda t: loop.stop())
+        tasks.cancel()
+
+        while not tasks.done() and not loop.is_closed():
+            loop.run_forever()
+
+        click.echo('Twicorder was terminated by the user')
         sys.exit(0)

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from httpx import Headers
 from twicorder.appdata import AppData
@@ -194,10 +194,11 @@ class RateLimit:
         return RateLimit(headers)
 
     def __repr__(self):
-        reset = datetime.fromtimestamp(self._reset)
+        reset = datetime.fromtimestamp(self._reset, timezone.utc)
+        local_reset = reset.astimezone()
         representation = (
             f'RateLimit(limit={self.cap}, remaining={self.remaining}, '
-            f'reset="{reset:%y.%m.%d %H:%M:%S}")'
+            f'reset="{local_reset:%y.%m.%d %H:%M:%S}")'
         )
         return representation
 
