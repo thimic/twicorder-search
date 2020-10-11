@@ -6,6 +6,7 @@ import hashlib
 import urllib
 
 from datetime import datetime
+from http import HTTPStatus
 
 from twicorder.appdata import AppData
 from twicorder.aio_auth import AsyncAuthHandler
@@ -169,8 +170,8 @@ class BaseRequestQuery(BaseQuery):
 
         # Check query response code. Return with error message if not a
         # successful 200 code.
-        if response.status_code != 200:
-            if response.status_code == 429:
+        if response.status_code != HTTPStatus.OK:
+            if response.status_code == HTTPStatus.TOO_MANY_REQUESTS:
                 self.log(f'Rate Limit in effect: {response.reason_phrase}')
                 self.log(f'Message: {response.json().get("message")}')
                 RateLimitCentral.insert(
@@ -180,6 +181,9 @@ class BaseRequestQuery(BaseQuery):
                     remaining=0,
                     reset=datetime.now().timestamp() + 60
                 )
+            elif response.status_code in (HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN):
+                msg = '<{r.status_code}> {r.reason_phrase}: {r.text}'.format(r=response)
+                raise RuntimeError(msg)
             else:
                 self.log(
                     '<{r.status_code}> {r.reason_phrase}: {r.text}'
@@ -213,7 +217,9 @@ class BaseRequestQuery(BaseQuery):
                 results = results.get(token, [])
         self._results = results
         if results and isinstance(results, list) and not self._last_cursor:
-            self._last_cursor = results[0].get('id')
+            first_result = results[0]
+            if isinstance(first_result, dict) and 'id' in first_result:
+                self._last_cursor = first_result.get('id')
         self._result_count += len(results)
         if self._max_count and self._result_count >= self._max_count:
             self._done = True
