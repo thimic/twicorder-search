@@ -61,9 +61,6 @@ save_extension: ".zip"
 # How often this config will be reloaded by the listener (minutes)
 config_reload_interval: 15
 
-# Additionally store tweets in MongoDB
-use_mongo: False
-
 # For every tweet with mentions, look up each mention's full user data
 full_user_mentions: True
 

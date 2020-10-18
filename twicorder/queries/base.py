@@ -32,9 +32,6 @@ class BaseQuery:
     _next_cursor_path = None
     _type = ResultType.Generic
 
-    _mongo_collection = None
-    _mongo_support = False
-
     def __init__(self, app_data: AppData, output: str = None,
                  max_count: int = 0, **kwargs):
         """
@@ -272,35 +269,6 @@ class BaseQuery:
         """
         return self._response_data
 
-    @property
-    def mongo_collection(self) -> Optional['pymongo.collection.Collection']:
-        """
-        Mongo collection tweets are ingested into, if the crawler is integrated
-        with MongoDB.
-
-        Returns:
-            pymongo.collection.Collection: MongoDb collection
-
-        """
-        if not self.mongo_support or not Config.use_mongo:
-            return
-        from twicorder import mongo
-        collection = self._mongo_collection
-        if not collection or not mongo.is_connected(collection):
-            self._mongo_collection = mongo.create_collection()
-        return self._mongo_collection
-
-    @property
-    def mongo_support(self) -> bool:
-        """
-        Whether this query supports pushing its results to MongoDB.
-
-        Returns:
-            bool: True if query supports MongoDB, else False
-
-        """
-        return self._mongo_support
-
     async def setup(self):
         """
         Method called immediately before the query runs.
@@ -400,26 +368,6 @@ class BaseQuery:
         results_str = '\n'.join(json.dumps(r) for r in self._results)
         write(f'{results_str}\n', file_path)
         self.log(f'Wrote {len(list(self.results))} results to "{file_path}"')
-
-    def push_to_mongodb(self):
-        """
-        Push results from query to MongoDB.
-        """
-        if not self.mongo_collection:
-            return
-        try:
-            for result in self._results:
-                data = copy.deepcopy(result)
-                data = timestamp_to_datetime(data)
-                self.mongo_collection.replace_one(
-                    {'id': data['id']},
-                    data,
-                    upsert=True
-                )
-        except Exception:
-            self.log(f'Unable to connect to MongoDB: {traceback.format_exc()}')
-        else:
-            self.log(f'Wrote {len(list(self.results))} tweets to MongoDB')
 
     async def bake_ids(self):
         """

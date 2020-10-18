@@ -53,7 +53,6 @@ setuptools.setup(
     keywords=['TWITTER', 'CRAWLER', 'RESEARCH'],
     install_requires=[
         'click',
-        'pymongo',
         'pyyaml',
         'requests',
     ],

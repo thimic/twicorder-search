@@ -66,12 +66,6 @@ def utils(ctx: click.Context, clear_cache: bool, purge_logs: bool):
 )
 @click.option('--task-file', help='Yaml file containing tasks to execute')
 @click.option(
-    '--use-mongo',
-    is_flag=True,
-    default=False,
-    help='Additionally store tweets in MongoDB'
-)
-@click.option(
     '--full-user-mentions',
     is_flag=True,
     default=False,
@@ -92,9 +86,8 @@ def utils(ctx: click.Context, clear_cache: bool, purge_logs: bool):
 @click.pass_context
 async def run(ctx: click.Context, consumer_key: str, consumer_secret: str,
               access_token: str, access_secret: str, out_dir: str,
-              out_extension: str, task_file: str, use_mongo: bool,
-              full_user_mentions: bool, user_lookup_interval: int,
-              appdata_timeout: float):
+              out_extension: str, task_file: str, full_user_mentions: bool,
+              user_lookup_interval: int, appdata_timeout: float):
     """
     Start crawler
     """
@@ -111,7 +104,6 @@ async def run(ctx: click.Context, consumer_key: str, consumer_secret: str,
         out_dir=out_dir,
         out_extension=out_extension,
         task_file=task_file,
-        use_mongo=use_mongo,
         full_user_mentions=full_user_mentions,
         user_lookup_interval=user_lookup_interval,
         appdata_timeout=appdata_timeout

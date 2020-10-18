@@ -20,8 +20,8 @@ class _Config:
     def __init__(self, consumer_key: str, consumer_secret: str,
                  access_token: str, access_secret: str, project_dir: str,
                  out_dir: str, out_extension: str, task_file: str,
-                 use_mongo: bool, full_user_mentions: bool,
-                 user_lookup_interval: int, appdata_timeout: float):
+                 full_user_mentions: bool, user_lookup_interval: int,
+                 appdata_timeout: float):
         """
         Gets config attributes from command line arguments or environment
         variables.
@@ -39,7 +39,6 @@ class _Config:
             out_dir (str): Save directory for recorded tweets
             out_extension (str): File extension for recorded tweets, i.e. '.zip'
             task_file (str): Path to YAML file containing tasks to execute
-            use_mongo (bool): Additionally store tweets in MongoDB
             full_user_mentions (bool): For mentions, look up full user data
             user_lookup_interval (int): Minutes between lookups of the same user
             appdata_timeout (float): Seconds to timeout for internal data store
@@ -55,7 +54,6 @@ class _Config:
         self._out_extension = out_extension or DEFAULT_OUTPUT_EXTENSION
         self._task_file = task_file or os.path.join(self._project_dir, 'tasks.yaml')
 
-        self._use_mongo = use_mongo
         self._full_user_mentions = full_user_mentions
         self._user_lookup_interval = user_lookup_interval
         self._appdata_timeout = appdata_timeout
@@ -117,13 +115,6 @@ class _Config:
         return self._task_file
 
     @property
-    def use_mongo(self) -> bool:
-        """
-        Additionally store tweets in MongoDB.
-        """
-        return self._use_mongo
-
-    @property
     def full_user_mentions(self) -> bool:
         """
         For mentions, look up full user data.
@@ -175,7 +166,7 @@ class _Config:
 
 def load(consumer_key=None, consumer_secret=None, access_token=None,
          access_secret=None, project_dir=None, out_dir=None, out_extension=None,
-         task_file=None, use_mongo=False, full_user_mentions=False,
+         task_file=None, full_user_mentions=False,
          user_lookup_interval=DEFAULT_EXPAND_USERS_INTERVAL,
          appdata_timeout=DEFAULT_APP_DATA_CONNECTION_TIMEOUT):
     """
@@ -190,7 +181,6 @@ def load(consumer_key=None, consumer_secret=None, access_token=None,
         out_dir (str): Save directory for recorded tweets
         out_extension (str): File extension for recorded tweets, i.e. '.zip'
         task_file (str): Path to YAML file containing tasks to execute
-        use_mongo (bool): Additionally store tweets in MongoDB
         full_user_mentions (bool): For mentions, look up full user data
         user_lookup_interval (int): Minutes between lookups of the same user
         appdata_timeout (float): Seconds to timeout for internal data store
@@ -206,7 +196,6 @@ def load(consumer_key=None, consumer_secret=None, access_token=None,
         out_extension=out_extension,
         out_dir=out_dir,
         task_file=task_file,
-        use_mongo=use_mongo,
         full_user_mentions=full_user_mentions,
         user_lookup_interval=user_lookup_interval,
         appdata_timeout=appdata_timeout
