@@ -3,18 +3,7 @@
 
 from __future__ import annotations
 
-import os
 import time
-import yaml
-
-from typing import List
-
-from twicorder import NoTasksException
-from twicorder.constants import (
-    DEFAULT_TASK_FREQUENCY,
-    DEFAULT_TASK_ITERATIONS,
-    DEFAULT_TASK_KWARGS,
-)
 
 
 class Task:
@@ -156,42 +145,3 @@ class Task:
         """
         self._last_run = time.time()
         self._queries.append(query)
-
-
-class TaskManager:
-
-    def __init__(self):
-        """
-        Reading tasks from yaml file and parsing to a dictionary.
-        """
-        from twicorder.config import Config
-        self._tasks = []
-        if not os.path.isfile(Config.task_file):
-            raise NoTasksException
-        with open(Config.task_file, 'r') as stream:
-            raw_tasks = yaml.full_load(stream)
-        for query, tasks in raw_tasks.items():
-            for raw_task in tasks or []:
-                frequency = raw_task.get('frequency') or DEFAULT_TASK_FREQUENCY
-                iters = raw_task.get('iterations') or DEFAULT_TASK_ITERATIONS
-                task = Task(
-                    name=query,
-                    frequency=frequency,
-                    iterations=iters,
-                    output=raw_task.get('output') or query,
-                    max_count=raw_task.get('max_count') or 0,
-                    **raw_task.get('kwargs') or DEFAULT_TASK_KWARGS
-                )
-                self._tasks.append(task)
-
-    @property
-    def tasks(self) -> List[Task]:
-        """
-        List of available tasks that are not finished.
-
-        Returns:
-            list[Task]: List of remaining tasks
-
-        """
-        self._tasks = [t for t in self._tasks if not t.done]
-        return self._tasks

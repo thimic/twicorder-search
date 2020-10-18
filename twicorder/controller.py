@@ -13,7 +13,8 @@ from twicorder.appdata import AppData
 from twicorder.config import Config
 from twicorder.logger import TwiLogger
 from twicorder.queries.base import BaseQuery
-from twicorder.tasks import Task, TaskManager
+from twicorder.tasks.manager import TaskManager
+from twicorder.tasks.task import Task
 
 logger = TwiLogger()
 
@@ -54,7 +55,7 @@ class Twicorder:
             logger.critical('Login credentials not found')
             sys.exit(1)
 
-        self._task_manager = TaskManager()
+        self._task_manager = TaskManager(Config.task_gen)
         self._query_types = {}
         self._running = False
 

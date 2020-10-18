@@ -10,6 +10,7 @@ import sys
 import aiosqlite
 
 from concurrent.futures import ThreadPoolExecutor
+from typing import List, Tuple
 
 from twicorder.constants import (
     DEFAULT_EXPAND_USERS_INTERVAL,
@@ -83,11 +84,20 @@ def utils(ctx: click.Context, clear_cache: bool, purge_logs: bool):
     show_default=True,
     help='Seconds to timeout for internal data store'
 )
+@click.option(
+    '--task-gen',
+    default=[('config', '')],
+    show_default=True,
+    type=click.Tuple([str, str]),
+    multiple=True,
+    help='Task generator(s) to use. Example: "user_id name_pattern=/tmp/**/*_ids.txt,delimiter=,"'
+)
 @click.pass_context
 async def run(ctx: click.Context, consumer_key: str, consumer_secret: str,
               access_token: str, access_secret: str, out_dir: str,
               out_extension: str, task_file: str, full_user_mentions: bool,
-              user_lookup_interval: int, appdata_timeout: float):
+              user_lookup_interval: int, appdata_timeout: float,
+              task_gen: List[Tuple[str, str]]):
     """
     Start crawler
     """
@@ -106,7 +116,8 @@ async def run(ctx: click.Context, consumer_key: str, consumer_secret: str,
         task_file=task_file,
         full_user_mentions=full_user_mentions,
         user_lookup_interval=user_lookup_interval,
-        appdata_timeout=appdata_timeout
+        appdata_timeout=appdata_timeout,
+        task_gen=task_gen
     )
     from twicorder.config import Config
     from twicorder.logger import TwiLogger

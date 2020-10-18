@@ -25,7 +25,7 @@ class BaseRequestQuery(BaseQuery):
     Queries based on the requests module and the twitter API.
     """
     _base_url = 'https://api.twitter.com/1.1'
-    _request_method = RequestMethod.Get
+    _request_method: RequestMethod = RequestMethod.Get
     _auth_methods = {AuthMethod.App, AuthMethod.User}
     _auth_method = AuthMethod.App
 
