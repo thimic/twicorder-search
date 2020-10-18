@@ -9,6 +9,7 @@ import traceback
 import yaml
 
 from datetime import datetime, timedelta
+from enum import Enum
 
 from twicorder.appdata import AppData
 from twicorder.config import Config
@@ -27,10 +28,25 @@ class BaseQuery:
     """
     name = NotImplemented
     endpoint = NotImplemented
+    result_type = NotImplemented
     _cursor_key = None
     _results_path = None
     _next_cursor_path = None
     _type = ResultType.Generic
+
+    class ResultType(Enum):
+        """
+        Enum for result types.
+        """
+        Tweet = 'tweet'
+        TweetList = 'tweet_list'
+        TweetID = 'tweet_id'
+        TweetIDList = 'tweet_id_list'
+        User = 'user'
+        UserList = 'user_list'
+        UserID = 'user_list'
+        UserIDList = 'user_id_list'
+        RateLimit = 'rate_limit'
 
     def __init__(self, app_data: AppData, output: str = None,
                  max_count: int = 0, **kwargs):

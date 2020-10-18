@@ -30,6 +30,7 @@ class FollowerIDQuery(ProductionRequestQuery):
 
     name = 'follower_ids'
     endpoint = '/followers/ids'
+    result_type = ProductionRequestQuery.ResultType.UserIDList
     _results_path = 'ids'
     _next_cursor_path = 'next_cursor'
     _cursor_key = 'cursor'

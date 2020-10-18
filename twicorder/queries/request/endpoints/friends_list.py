@@ -8,3 +8,4 @@ class FriendsList(ProductionRequestQuery):
 
     name = 'friends_list'
     endpoint = '/friends/list'
+    result_type = ProductionRequestQuery.ResultType.UserList

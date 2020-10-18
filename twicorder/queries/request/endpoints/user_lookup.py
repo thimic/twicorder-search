@@ -28,6 +28,7 @@ class UserLookupQuery(ProductionRequestQuery):
 
     name = 'user_lookups'
     endpoint = '/users/lookup'
+    result_type = ProductionRequestQuery.ResultType.UserList
 
     def __init__(self, app_data: AppData, output: str = None,
                  max_count: int = 0, **kwargs):

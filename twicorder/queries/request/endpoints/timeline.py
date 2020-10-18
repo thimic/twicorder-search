@@ -28,6 +28,7 @@ class TimelineQuery(TweetRequestQuery):
 
     name = 'user_timeline'
     endpoint = '/statuses/user_timeline'
+    result_type = TweetRequestQuery.ResultType.TweetList
     _cursor_key = 'since_id'
 
     def __init__(self, app_data: AppData, output: str = None,

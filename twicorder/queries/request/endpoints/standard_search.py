@@ -12,6 +12,7 @@ class StandardSearchQuery(TweetRequestQuery):
 
     name = 'free_search'
     endpoint = '/search/tweets'
+    result_type = TweetRequestQuery.ResultType.TweetList
     _cursor_key = 'since_id'
     _results_path = 'statuses'
     _next_cursor_path = 'search_metadata.next_results'

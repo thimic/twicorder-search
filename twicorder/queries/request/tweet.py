@@ -15,6 +15,8 @@ class TweetRequestQuery(ProductionRequestQuery):
     Base class for queries returning tweets.
     """
 
+    result_type = ProductionRequestQuery.ResultType.TweetList
+
     def result_timestamp(self, result) -> datetime:
         """
         For a given result produced by the current query, return its time stamp.

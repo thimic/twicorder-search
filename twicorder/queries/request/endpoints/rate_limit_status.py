@@ -8,3 +8,4 @@ class RateLimitStatusQuery(BaseRequestQuery):
 
     name = 'rate_limit_status'
     endpoint = '/application/rate_limit_status'
+    result_type = BaseRequestQuery.ResultType.RateLimit

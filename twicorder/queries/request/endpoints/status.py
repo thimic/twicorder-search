@@ -9,6 +9,7 @@ class StatusQuery(TweetRequestQuery):
 
     name = 'status'
     endpoint = '/statuses/lookup'
+    result_type = TweetRequestQuery.ResultType.TweetList
 
     def __init__(self, app_data: AppData, output: str = None,
                  max_count: int = 0, **kwargs):
