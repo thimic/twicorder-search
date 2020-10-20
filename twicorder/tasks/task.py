@@ -5,8 +5,14 @@ from __future__ import annotations
 
 import time
 
+from typing import Callable, Optional
+
+from twicorder.queries import BaseQuery
+
 
 class Task:
+
+    stop_func: Optional[Callable[[BaseQuery], bool]] = None
 
     def __init__(self, name, frequency=15, iterations=0, output=None, **kwargs):
         self._name = name

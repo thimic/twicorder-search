@@ -40,6 +40,19 @@ class UserLookupQuery(ProductionRequestQuery):
         self._kwargs['include_entities'] = 'true'
         self._kwargs.update(kwargs)
 
+    def result_id(self, result: dict) -> str:
+        """
+        For a given result produced by the current query, return its ID.
+
+        Args:
+            result (dict): One single result object
+
+        Returns:
+            str: Result ID
+
+        """
+        return str(result['id'])
+
     async def finalise(self, response: httpx.Response):
         """
         Method called immediately after the query runs.

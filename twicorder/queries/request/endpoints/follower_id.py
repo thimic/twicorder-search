@@ -58,7 +58,7 @@ class FollowerIDQuery(ProductionRequestQuery):
             url += f'?{urllib.parse.urlencode(self.kwargs)}'
         return url
 
-    def result_id(self, result: object) -> str:
+    def result_id(self, result: int) -> str:
         """
         For a given result produced by the current query, return its ID.
 
@@ -88,6 +88,6 @@ class FollowerIDQuery(ProductionRequestQuery):
         # completed successfully. This saves us from searching all the way back
         # to the beginning on next crawl. Instead we can stop when we encounter
         # this tweet.
-        if self._done and self.last_cursor:
+        if self.done and self.last_cursor:
             self.log(f'Cached ID of last tweet returned by query to disk.')
             await self.app_data.set_last_cursor(self.uid, self.last_cursor)

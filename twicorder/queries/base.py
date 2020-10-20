@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from __future__ import annotations
+
 import copy
 import httpx
 import json
@@ -19,7 +21,7 @@ from twicorder.constants import (
 )
 from twicorder.utils import write, timestamp_to_datetime
 
-from typing import Optional, Iterable
+from typing import Any, Optional, Iterable, Callable
 
 
 class BaseQuery:
@@ -49,7 +51,9 @@ class BaseQuery:
         RateLimit = 'rate_limit'
 
     def __init__(self, app_data: AppData, output: str = None,
-                 max_count: int = 0, **kwargs):
+                 max_count: int = 0,
+                 stop_func: Optional[Callable[[BaseQuery], bool]] = None,
+                 **kwargs):
         """
         BaseQuery constructor.
 
@@ -57,6 +61,8 @@ class BaseQuery:
             app_data: AppData object for persistent storage between sessions
             output: Output directory, relative to project directory
             max_count: Max results to query
+            stop_func: Custom function that takes the query as input. If
+                       returning True, the query will report as done
             **kwargs: Keyword arguments for building the query url
 
         """
@@ -71,6 +77,9 @@ class BaseQuery:
         self._output = output
         self._kwargs = kwargs
         self._orig_kwargs = copy.deepcopy(kwargs)
+        self._iterations = 0
+        self._stop_func = stop_func
+
         self._log = []
 
     def __eq__(self, other):
@@ -137,6 +146,16 @@ class BaseQuery:
         return self._max_count
 
     @property
+    def iterations(self) -> int:
+        """
+        Number of times the query has been called while not reporting done.
+
+        Returns:
+
+        """
+        return self._iterations
+
+    @property
     def results_path(self) -> str:
         """
         Key for result data if result is a dictionary. Each level of the
@@ -201,7 +220,11 @@ class BaseQuery:
             bool: True if the query is complete, else False
 
         """
-        return self._done
+        if self._done:
+            return True
+        if self._stop_func:
+            return self._stop_func(self)
+        return False
 
     @done.setter
     def done(self, value: bool):
@@ -316,6 +339,7 @@ class BaseQuery:
         await self.setup()
         response = await self.run()
         await self.finalise(response)
+        self._iterations += 1
         return self.results
 
     def result_timestamp(self, result) -> datetime:
@@ -331,7 +355,7 @@ class BaseQuery:
         """
         return datetime.utcnow()
 
-    def result_id(self, result: object) -> str:
+    def result_id(self, result: Any) -> str:
         """
         For a given result produced by the current query, return its ID.
 

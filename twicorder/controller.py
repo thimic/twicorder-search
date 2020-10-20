@@ -164,7 +164,12 @@ class Twicorder:
 
         """
         query_object = self.query_types[task.name]
-        query = query_object(app_data, task.output, **task.kwargs)
+        query: BaseQuery = query_object(
+            app_data=app_data,
+            output=task.output,
+            stop_func=task.stop_func,
+            **task.kwargs
+        )
         task.add_query(query)
         return query
 

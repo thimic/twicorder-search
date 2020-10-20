@@ -4,6 +4,7 @@
 from asyncio import create_task, gather, sleep, Queue, Task
 from typing import Callable, Dict, Optional
 
+from twicorder.queries import BaseQuery
 from twicorder.logger import TwiLogger
 
 logger = TwiLogger()
@@ -35,7 +36,7 @@ async def worker(name: str, queue: Queue, on_result: Optional[Callable] = None):
     Fetches query from queue and executes it.
     """
     while True:
-        query = await queue.get()
+        query: BaseQuery = await queue.get()
         if query is None:
             logger.debug(
                 f'Terminated worker "{name}" after tombstone query.'
@@ -58,7 +59,7 @@ async def worker(name: str, queue: Queue, on_result: Optional[Callable] = None):
                     break
             if on_result:
                 await on_result(query)
-            logger.debug(query.fetch_log())
+            logger.info(query.fetch_log())
             await sleep(0.05)
         queue.task_done()
         if queue.empty():
