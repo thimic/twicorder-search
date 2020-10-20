@@ -11,11 +11,23 @@ logger = TwiLogger()
 
 class QueryQueue(Queue):
     """
-    AsyncIO Queue with queue property exposed.
+    AsyncIO Queue that ignores duplicate items.
     """
-    @property
-    def queue(self):
-        return self._queue
+    def __init__(self, maxsize=0, *, loop=None):
+        super(QueryQueue, self).__init__(maxsize=maxsize, loop=loop)
+        self._items = set()
+
+    def _put(self, item) -> None:
+        uid = id(item)
+        if uid in self._items:
+            return
+        self._items.add(uid)
+        super(QueryQueue, self)._put(item=item)
+
+    def _get(self):
+        item = super(QueryQueue, self)._get()
+        self._items.remove(id(item))
+        return item
 
 
 async def worker(name: str, queue: Queue, on_result: Optional[Callable] = None):
@@ -46,7 +58,7 @@ async def worker(name: str, queue: Queue, on_result: Optional[Callable] = None):
                     break
             if on_result:
                 await on_result(query)
-            logger.info(query.fetch_log())
+            logger.debug(query.fetch_log())
             await sleep(0.05)
         queue.task_done()
         if queue.empty():
@@ -117,9 +129,6 @@ class QueryExchange:
 
         """
         queue = cls.get_queue(query.endpoint)
-        if query in queue.queue:
-            logger.info(f'Query with ID {query.uid} is already in the queue.')
-            return
         queue.put_nowait(query)
         cls.start_worker(query.endpoint, queue, callback)
 

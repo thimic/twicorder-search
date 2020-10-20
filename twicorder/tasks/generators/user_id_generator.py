@@ -68,11 +68,3 @@ class UserIDTaskGenerator(BaseTaskGenerator):
                     user_id=','.join(request_chunk)
                 )
             )
-
-
-if __name__ == '__main__':
-    generator = UserIDTaskGenerator('/Users/thimic/Desktop/follower_ids/*.txt')
-    generator.fetch()
-    print(len(generator.tasks))
-    from pprint import pprint
-    pprint(generator.tasks[0]._kwargs)

@@ -33,10 +33,10 @@ class TwiLogger:
         cls._logger.addHandler(file_handler)
 
         stream_handler = StreamHandler(sys.stdout)
-        stream_handler.setLevel(logging.DEBUG)
+        stream_handler.setLevel(logging.INFO)
         cls._logger.addHandler(stream_handler)
 
-        cls._logger.setLevel(logging.DEBUG)
+        cls._logger.setLevel(logging.INFO)
 
     def __new__(cls, *args, **kwargs):
         if not cls._logger:

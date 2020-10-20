@@ -116,8 +116,6 @@ class Twicorder:
         from twicorder.appdata import AppData
         from twicorder.exchange import QueryExchange
         app_data = AppData(db=db)
-        logger.info(' Loading tasks '.center(80, '='))
-        logger.info('')
         slept = 0
         try:
             while self._running and (self.tasks or QueryExchange.active()):
@@ -126,7 +124,8 @@ class Twicorder:
                 if not 0 < slept <= 60:
                     slept = 1
                     update = False
-
+                    logger.info(' Loading tasks '.center(80, '='))
+                    task_count = 0
                     for task in self.tasks:
                         if not task.due:
                             continue
@@ -134,8 +133,9 @@ class Twicorder:
                         query = self.cast_query(app_data, task)
                         # Todo: Finish callback logic!
                         QueryExchange.add(query, self.on_query_result)
-                        logger.info(query)
+                        task_count += 1
                     if update:
+                        logger.info('Added %s tasks', task_count)
                         logger.info('=' * 80)
                     continue
                 # Sleep 1 second, count the number of seconds slept and continue.
@@ -166,8 +166,6 @@ class Twicorder:
         query_object = self.query_types[task.name]
         query = query_object(app_data, task.output, **task.kwargs)
         task.add_query(query)
-        print(f'Task name: {task.name}, remaining: {task.remaining}')
-        # task.checkout()
         return query
 
     @staticmethod
