@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from __future__ import annotations
+
 import asyncio
 import hashlib
 import urllib
 
 from datetime import datetime
 from http import HTTPStatus
+from typing import Callable, Optional, Set
 
 from twicorder.appdata import AppData
 from twicorder.aio_auth import AsyncAuthHandler
@@ -16,8 +19,6 @@ from twicorder.constants import (
 )
 from twicorder.queries.base import BaseQuery
 from twicorder.rate_limits import RateLimitCentral
-
-from typing import Set
 
 
 class BaseRequestQuery(BaseQuery):
@@ -38,9 +39,11 @@ class BaseRequestQuery(BaseQuery):
         '_request_method'
     ]
 
-    def __init__(self, app_data: AppData, output: str = None,
-                 max_count: int = 0, **kwargs):
-        super().__init__(app_data, output, max_count, **kwargs)
+    def __init__(self, app_data: AppData, taskgen: str, output: str = None,
+                 max_count: int = 0,
+                 stop_func: Optional[Callable[[BaseRequestQuery], bool]] = None,
+                 **kwargs):
+        super().__init__(app_data, taskgen, output, max_count, stop_func, **kwargs)
 
     def __eq__(self, other):
         return type(self) == type(other) and self.uid == other.uid

@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from __future__ import annotations
+
+import httpx
 import urllib
+
+from datetime import datetime
+from typing import Callable, Optional
 
 from twicorder.appdata import AppData
 from twicorder.constants import RequestMethod
@@ -31,9 +37,11 @@ class TimelineQuery(TweetRequestQuery):
     result_type = TweetRequestQuery.ResultType.TweetList
     _cursor_key = 'since_id'
 
-    def __init__(self, app_data: AppData, output: str = None,
-                 max_count: int = 0, **kwargs):
-        super().__init__(app_data, output, max_count, **kwargs)
+    def __init__(self, app_data: AppData, taskgen: str, output: str = None,
+                 max_count: int = 0,
+                 stop_func: Optional[Callable[[TimelineQuery], bool]] = None,
+                 **kwargs):
+        super().__init__(app_data, taskgen, output, max_count, stop_func, **kwargs)
         self._kwargs['tweet_mode'] = 'extended'
         self._kwargs['result_type'] = 'recent'
         self._kwargs['count'] = 200
@@ -73,3 +81,14 @@ class TimelineQuery(TweetRequestQuery):
         if last_return and int(self._next_cursor) >= int(last_return):
             self.done = True
         return response
+
+    async def finalise(self, response: httpx.Response):
+        await super().finalise(response)
+        if not self.done:
+            return
+
+        task_id = self.kwargs.get('user_id', self.kwargs.get('screen_name'))
+        if not task_id:
+            return
+        timestamp = int(datetime.utcnow().timestamp())
+        await self.app_data.add_taskgen_id(self.taskgen, task_id, timestamp)

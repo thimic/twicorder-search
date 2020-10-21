@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from __future__ import annotations
+
 import httpx
 import urllib
+
+from typing import Callable, Optional
 
 from twicorder.appdata import AppData
 from twicorder.constants import RequestMethod
@@ -35,9 +39,11 @@ class FollowerIDQuery(ProductionRequestQuery):
     _next_cursor_path = 'next_cursor'
     _cursor_key = 'cursor'
 
-    def __init__(self, app_data: AppData, output: str = None,
-                 max_count: int = 0, **kwargs):
-        super().__init__(app_data, output, max_count, **kwargs)
+    def __init__(self, app_data: AppData, taskgen: str, output: str = None,
+                 max_count: int = 0,
+                 stop_func: Optional[Callable[[FollowerIDQuery], bool]] = None,
+                 **kwargs):
+        super().__init__(app_data, taskgen, output, max_count, stop_func, **kwargs)
         self._kwargs['count'] = '5000'
         self._kwargs.update(kwargs)
 

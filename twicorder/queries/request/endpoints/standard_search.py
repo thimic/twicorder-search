@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from __future__ import annotations
+
 import urllib
+
+from typing import Callable, Optional
 
 from twicorder.appdata import AppData
 from twicorder.constants import RequestMethod
@@ -17,9 +21,11 @@ class StandardSearchQuery(TweetRequestQuery):
     _results_path = 'statuses'
     _next_cursor_path = 'search_metadata.next_results'
 
-    def __init__(self, app_data: AppData, output: str = None,
-                 max_count: int = 0, **kwargs):
-        super().__init__(app_data, output, max_count, **kwargs)
+    def __init__(self, app_data: AppData, taskgen: str, output: str = None,
+                 max_count: int = 0,
+                 stop_func: Optional[Callable[[StandardSearchQuery], bool]] = None,
+                 **kwargs):
+        super().__init__(app_data, taskgen, output, max_count, stop_func, **kwargs)
         self._kwargs['tweet_mode'] = 'extended'
         self._kwargs['result_type'] = 'recent'
         self._kwargs['count'] = 100

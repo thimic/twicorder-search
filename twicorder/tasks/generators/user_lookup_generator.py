@@ -5,9 +5,10 @@ from __future__ import annotations
 
 from enum import Enum
 from pathlib import Path
-from typing import Set
+from typing import Set, Tuple
 
 from twicorder import NoTasksException
+from twicorder.appdata import AppData
 from twicorder.tasks.task import Task
 
 from twicorder.tasks.generators.base_generator import BaseTaskGenerator
@@ -27,24 +28,25 @@ class UserLookupTaskGenerator(BaseTaskGenerator):
 
     name = 'user_lookups'
 
-    def __init__(self, name_pattern: str, delimiter: str = '\n',
+    def __init__(self, app_data: AppData, name_pattern: str, delimiter: str = '\n',
                  lookup_method: str = 'id'):
         """
         Entry point for UserLookupTaskGenerator.
 
         Args:
+            app_data: AppData object for persistent storage between sessions
             name_pattern: Glob name pattern
             delimiter: User ID/name delimiter. Defaults to new line.
             lookup_method: "id" if looking up user ids or "username" if looking
                            up user names
 
         """
-        super().__init__()
+        super().__init__(app_data=app_data)
         self._name_pattern = name_pattern
         self._delimiter = delimiter
         self._lookup_method = self.LookupMethod(lookup_method)
 
-    def fetch(self):
+    async def fetch(self):
         """
         Method to generate tasks. Should populate UserLookupTaskGenerator._tasks.
         """
@@ -53,17 +55,22 @@ class UserLookupTaskGenerator(BaseTaskGenerator):
         for filepath in Path('/').glob(self._name_pattern.lstrip('/')):
             users.update(filepath.read_text().splitlines())
 
-        if self._lookup_method == self.LookupMethod.Id:
-            sorted_users = sorted(users, key=lambda x: int(x))
-        else:
-            sorted_users = sorted(users)
-
-        if not sorted_users:
+        if not users:
             msg = (
                 f'Found no files containing usernames or IDs for name pattern '
                 f'{self._name_pattern!r}.'
             )
             raise NoTasksException(msg)
+
+        # Remove already crawled users
+        existing: Tuple[Tuple[str, int]] = await self._app_data.get_taskgen_ids(self.name)
+        existing_users = {e[0] for e in existing}
+        users = users.difference(existing_users)
+
+        if self._lookup_method == self.LookupMethod.Id:
+            sorted_users = sorted(users, key=lambda x: int(x))
+        else:
+            sorted_users = sorted(users)
 
         users_per_query = 100
         request_chunks = [
@@ -73,6 +80,7 @@ class UserLookupTaskGenerator(BaseTaskGenerator):
         for request_chunk in request_chunks:
             kwargs = dict(
                 name='user_lookups',
+                taskgen=self.name,
                 frequency=10000,
                 iterations=1,
                 output='user_lookups',

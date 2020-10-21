@@ -3,6 +3,8 @@
 
 import aiosqlite
 
+from typing import Tuple
+
 
 class AppData:
     """
@@ -42,20 +44,31 @@ class AppData:
         await self.db.execute(query)
         await self.db.commit()
 
-    async def add_query_object(self, query_name, object_id, timestamp):
-        await self._make_query_table(query_name)
+    async def _make_taskgen_table(self, taskgen_name):
         query = f'''
-            INSERT OR REPLACE INTO {query_name} VALUES (
+            CREATE TABLE IF NOT EXISTS [{taskgen_name}] (
+                task_id TEXT PRIMARY KEY,
+                timestamp INTEGER NOT NULL
+            )
+            '''
+        await self.db.execute(query)
+
+    async def add_query_object(self, query_name, object_id, timestamp):
+        table_name = f'query_{query_name}'
+        await self._make_query_table(table_name)
+        query = f'''
+            INSERT OR REPLACE INTO {table_name} VALUES (
                 ?, ?
             )
             '''
         await self.db.execute(query, (object_id, timestamp))
         await self.db.commit()
 
-    async def add_query_objects(self, query_name, objects):
-        await self._make_query_table(query_name)
+    async def add_query_objects(self, query_name, objects: Tuple[Tuple[int, int]]):
+        table_name = f'query_{query_name}'
+        await self._make_query_table(table_name)
         query = f'''
-            INSERT OR REPLACE INTO {query_name} VALUES (
+            INSERT OR REPLACE INTO {table_name} VALUES (
                 ?, ?
             )
             '''
@@ -63,15 +76,84 @@ class AppData:
         await self.db.commit()
 
     async def get_query_objects(self, query_name):
-        await self._make_query_table(query_name)
+        table_name = f'query_{query_name}'
+        await self._make_query_table(table_name)
         query = f'''
             SELECT DISTINCT
                 object_id, timestamp
             FROM
-                {query_name}
+                {table_name}
             '''
         async with self.db.execute(query) as cursor:
             return await cursor.fetchall()
+
+    async def has_query_object(self, query_name, object_id) -> bool:
+        table_name = f'query_{query_name}'
+        await self._make_query_table(table_name)
+        query = f'''
+            SELECT EXISTS(
+                SELECT 
+                    1 
+                FROM 
+                    {table_name} 
+                WHERE 
+                    task_id="{object_id}"
+            )
+            '''
+        async with self.db.execute(query) as cursor:
+            result = await cursor.fetchone()
+            return bool(result[0])
+
+    async def add_taskgen_id(self, taskgen_name, task_id, timestamp):
+        table_name = f'taskgen_{taskgen_name}'
+        await self._make_taskgen_table(table_name)
+        query = f'''
+            INSERT OR REPLACE INTO {table_name} VALUES (
+                ?, ?
+            )
+            '''
+        await self.db.execute(query, (task_id, timestamp))
+        await self.db.commit()
+
+    async def add_taskgen_ids(self, taskgen_name, task_ids: Tuple[Tuple[str, int]]):
+        table_name = f'taskgen_{taskgen_name}'
+        await self._make_taskgen_table(table_name)
+        query = f'''
+            INSERT OR REPLACE INTO {table_name} VALUES (
+                ?, ?
+            )
+            '''
+        await self.db.executemany(query, task_ids)
+        await self.db.commit()
+
+    async def get_taskgen_ids(self, taskgen_name):
+        table_name = f'taskgen_{taskgen_name}'
+        await self._make_taskgen_table(table_name)
+        query = f'''
+            SELECT DISTINCT
+                task_id, timestamp
+            FROM
+                {table_name}
+            '''
+        async with self.db.execute(query) as cursor:
+            return await cursor.fetchall()
+
+    async def has_taskgen_id(self, taskgen_name, task_id) -> bool:
+        table_name = f'taskgen_{taskgen_name}'
+        await self._make_taskgen_table(table_name)
+        query = f'''
+            SELECT EXISTS(
+                SELECT 
+                    1 
+                FROM 
+                    {table_name} 
+                WHERE 
+                    task_id="{task_id}"
+            )
+            '''
+        async with self.db.execute(query) as cursor:
+            result = await cursor.fetchone()
+            return bool(result[0])
 
     async def set_last_cursor(self, query_hash, object_id):
         await self._make_last_id_table()
@@ -89,8 +171,7 @@ class AppData:
     async def get_last_cursor(self, query_hash):
         await self._make_last_id_table()
         query = '''
-            SELECT
-            DISTINCT
+            SELECT DISTINCT
                 object_id
             FROM
                 queries_last_id

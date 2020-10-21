@@ -50,7 +50,7 @@ class BaseQuery:
         UserIDList = 'user_id_list'
         RateLimit = 'rate_limit'
 
-    def __init__(self, app_data: AppData, output: str = None,
+    def __init__(self, app_data: AppData, taskgen: str, output: str = None,
                  max_count: int = 0,
                  stop_func: Optional[Callable[[BaseQuery], bool]] = None,
                  **kwargs):
@@ -59,6 +59,7 @@ class BaseQuery:
 
         Args:
             app_data: AppData object for persistent storage between sessions
+            taskgen: Name of the generator that created the task query
             output: Output directory, relative to project directory
             max_count: Max results to query
             stop_func: Custom function that takes the query as input. If
@@ -67,6 +68,7 @@ class BaseQuery:
 
         """
         self._app_data = app_data
+        self._taskgen = taskgen
         self._done = False
         self._max_count = max_count
         self._next_cursor = None
@@ -98,6 +100,17 @@ class BaseQuery:
         AppData object for persistent storage between sessions.
         """
         return self._app_data
+
+    @property
+    def taskgen(self) -> str:
+        """
+        Name of the generator that created the task query.
+
+        Returns:
+            Task generator name
+
+        """
+        return self._taskgen
 
     @property
     def output(self) -> Optional[str]:
@@ -338,8 +351,8 @@ class BaseQuery:
         """
         await self.setup()
         response = await self.run()
-        await self.finalise(response)
         self._iterations += 1
+        await self.finalise(response)
         return self.results
 
     def result_timestamp(self, result) -> datetime:

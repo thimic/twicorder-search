@@ -72,7 +72,7 @@ class RateLimitCentral:
 
         """
         from twicorder.queries.request.endpoints import RateLimitStatusQuery
-        query = RateLimitStatusQuery(app_data)
+        query = RateLimitStatusQuery(app_data, 'twicorder')
         query.auth_method = auth_method
         results = await query.start()
         for resource, family in results['resources'].items():

@@ -55,31 +55,8 @@ class Twicorder:
             logger.critical('Login credentials not found')
             sys.exit(1)
 
-        self._task_manager = TaskManager(Config.task_gen)
         self._query_types = {}
         self._running = False
-
-    @property
-    def task_manager(self):
-        """
-        Task manager instance for Twicorder.
-
-        Returns:
-            twicorder.tasks.TaskManager: Task manager instance
-
-        """
-        return self._task_manager
-
-    @property
-    def tasks(self):
-        """
-        List of tasks registered in the task manager.
-
-        Returns:
-            list[twicorder.tasks.Task]: List of tasks
-
-        """
-        return self._task_manager.tasks
 
     @property
     def query_types(self):
@@ -113,12 +90,13 @@ class Twicorder:
         Starts crawler.
         """
         self._running = True
-        from twicorder.appdata import AppData
         from twicorder.exchange import QueryExchange
         app_data = AppData(db=db)
+        task_manager = TaskManager(app_data, Config.task_gen)
+        await task_manager.load()
         slept = 0
         try:
-            while self._running and (self.tasks or QueryExchange.active()):
+            while self._running and (task_manager.tasks or QueryExchange.active()):
                 # Check if any queries are due to run every 60 seconds. Don't
                 # wait on first run.
                 if not 0 < slept <= 60:
@@ -126,7 +104,7 @@ class Twicorder:
                     update = False
                     logger.info(' Loading tasks '.center(80, '='))
                     task_count = 0
-                    for task in self.tasks:
+                    for task in task_manager.tasks:
                         if not task.due:
                             continue
                         update = True
@@ -145,7 +123,7 @@ class Twicorder:
             logger.info('\n' + '=' * 80)
             logger.info('Exiting...')
             logger.info('=' * 80 + '\n')
-        if not self.tasks:
+        if not task_manager.tasks:
             logger.info('\n' + '=' * 80)
             logger.info('No more tasks to execute. Exiting...')
             logger.info('=' * 80 + '\n')
@@ -166,6 +144,7 @@ class Twicorder:
         query_object = self.query_types[task.name]
         query: BaseQuery = query_object(
             app_data=app_data,
+            taskgen=task.taskgen,
             output=task.output,
             stop_func=task.stop_func,
             **task.kwargs

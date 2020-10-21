@@ -6,6 +6,9 @@ from __future__ import annotations
 import os
 import yaml
 
+from asyncio import get_event_loop
+from concurrent.futures import ThreadPoolExecutor
+
 from twicorder import NoTasksException
 from twicorder.constants import (
     DEFAULT_TASK_FREQUENCY,
@@ -24,9 +27,12 @@ class ConfigTaskGenerator(BaseTaskGenerator):
 
     name = 'config'
 
-    def fetch(self):
+    _executor = ThreadPoolExecutor(1)
+
+    def sync_fetch(self):
         """
-        Method to generate tasks. Should populate BaseTaskGenerator._tasks.
+        Synchronous method to generate tasks. Should populate
+        BaseTaskGenerator._tasks.
         """
         from twicorder.config import Config
         if not os.path.isfile(Config.task_file):
@@ -39,6 +45,7 @@ class ConfigTaskGenerator(BaseTaskGenerator):
                 iters = raw_task.get('iterations') or DEFAULT_TASK_ITERATIONS
                 task = Task(
                     name=query,
+                    taskgen=self.name,
                     frequency=frequency,
                     iterations=iters,
                     output=raw_task.get('output') or query,
@@ -46,3 +53,10 @@ class ConfigTaskGenerator(BaseTaskGenerator):
                     **raw_task.get('kwargs') or DEFAULT_TASK_KWARGS
                 )
                 self._tasks.append(task)
+
+    async def fetch(self):
+        """
+        Method to generate tasks. Should populate BaseTaskGenerator._tasks.
+        """
+        loop = get_event_loop()
+        await loop.run_in_executor(self._executor, self.sync_fetch)

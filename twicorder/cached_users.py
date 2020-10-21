@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from __future__ import annotations
+
 from datetime import datetime, timedelta
 from asyncio import Lock
-from typing import Iterable
+from typing import Callable, Iterable, Optional
 
 from twicorder.appdata import AppData
 from twicorder.config import Config
@@ -17,9 +19,11 @@ class UserQuery(ProductionRequestQuery):
     name = 'cached_user'
     endpoint = '/users/lookup'
 
-    def __init__(self, app_data: AppData, output: str = None,
-                 max_count: int = 0, **kwargs):
-        super(UserQuery, self).__init__(app_data, output, max_count, **kwargs)
+    def __init__(self, app_data: AppData, taskgen: str, output: str = None,
+                 max_count: int = 0,
+                 stop_func: Optional[Callable[[UserQuery], bool]] = None,
+                 **kwargs):
+        super(UserQuery, self).__init__(app_data, taskgen, output, max_count, stop_func, **kwargs)
         self._kwargs['tweet_mode'] = 'extended'
         self._kwargs['include_entities'] = 'true'
         self._kwargs.update(kwargs)

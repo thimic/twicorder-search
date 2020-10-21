@@ -9,7 +9,8 @@ import yaml
 from unittest import TestCase
 
 from twicorder import NoTasksException
-from twicorder.tasks import Task, TaskManager
+from twicorder.tasks.manager import TaskManager
+from twicorder.tasks.task import Task
 
 
 class TestTask(TestCase):
@@ -17,6 +18,7 @@ class TestTask(TestCase):
     def setUp(self) -> None:
         self.oneoff_task = Task(
             name='user_timeline',
+            taskgen='test',
             frequency=1,
             iterations=1,
             output='foo/timeline',
@@ -25,6 +27,7 @@ class TestTask(TestCase):
 
         self.repeating_task = Task(
             name='user_timeline',
+            taskgen='test',
             frequency=15,
             iterations=0,
             output='bar/timeline',
@@ -39,6 +42,7 @@ class TestTask(TestCase):
         oneoff_expectation = (
             'Task('
             'name=\'user_timeline\', '
+            'taskgen=\'test\', '
             'frequency=1, '
             'iterations=1, '
             'output=\'foo/timeline\', '
@@ -50,6 +54,7 @@ class TestTask(TestCase):
         repeating_expectation = (
             'Task('
             'name=\'user_timeline\', '
+            'taskgen=\'test\', '
             'frequency=15, '
             'iterations=0, '
             'output=\'bar/timeline\', '
@@ -77,23 +82,6 @@ class TestTask(TestCase):
     def test_kwargs(self):
         self.assertDictEqual({'screen_name': 'foo'}, self.oneoff_task.kwargs)
         self.assertDictEqual({'screen_name': 'bar'}, self.repeating_task.kwargs)
-
-    def test_checkout(self):
-        self.assertEqual(1, self.oneoff_task.remaining)
-        self.assertTrue(self.oneoff_task.due)
-        self.assertFalse(self.oneoff_task.done)
-        self.assertEqual(self.oneoff_task, self.oneoff_task.checkout())
-        self.assertEqual(0, self.oneoff_task.remaining)
-        self.assertFalse(self.oneoff_task.due)
-        self.assertTrue(self.oneoff_task.done)
-
-        self.assertEqual(0, self.repeating_task.remaining)
-        self.assertTrue(self.repeating_task.due)
-        self.assertFalse(self.repeating_task.done)
-        self.assertEqual(self.repeating_task, self.repeating_task.checkout())
-        self.assertEqual(0, self.repeating_task.remaining)
-        self.assertFalse(self.repeating_task.due)
-        self.assertFalse(self.repeating_task.done)
 
 
 class TestTaskManager(TestCase):
@@ -141,11 +129,11 @@ class TestTaskManager(TestCase):
     def test_missing_tasks(self):
         from twicorder import config
         config.load(project_dir=tempfile.mkdtemp())
-        self.assertRaises(NoTasksException, TaskManager)
+        self.assertRaises(NoTasksException, TaskManager, [('config', {})])
 
     def test_tasks(self):
         self.setUpConfig()
-        manager = TaskManager()
+        manager = TaskManager([('config', {})])
         self.assertEqual(3, len(manager.tasks))
 
         # Oneoff
@@ -153,7 +141,10 @@ class TestTaskManager(TestCase):
         self.assertEqual(1, manager.tasks[0].iterations)
         self.assertEqual(1, manager.tasks[0].remaining)
         self.assertEqual('oneoff/timeline', manager.tasks[0].output)
-        self.assertDictEqual({'screen_name': 'oneoff'}, manager.tasks[0].kwargs)
+        self.assertDictEqual(
+            {'max_count': 0, 'screen_name': 'oneoff'},
+            manager.tasks[0].kwargs
+        )
         self.assertFalse(manager.tasks[0].done)
 
         # Finite
@@ -161,7 +152,10 @@ class TestTaskManager(TestCase):
         self.assertEqual(10, manager.tasks[1].iterations)
         self.assertEqual(10, manager.tasks[1].remaining)
         self.assertEqual('finite/timeline', manager.tasks[1].output)
-        self.assertDictEqual({'screen_name': 'finite'}, manager.tasks[1].kwargs)
+        self.assertDictEqual(
+            {'max_count': 0, 'screen_name': 'finite'},
+            manager.tasks[1].kwargs
+        )
         self.assertFalse(manager.tasks[1].done)
 
         # Repeating
@@ -169,5 +163,8 @@ class TestTaskManager(TestCase):
         self.assertEqual(0, manager.tasks[2].iterations)
         self.assertEqual(0, manager.tasks[2].remaining)
         self.assertEqual('repeating/timeline', manager.tasks[2].output)
-        self.assertDictEqual({'screen_name': 'repeating'}, manager.tasks[2].kwargs)
+        self.assertDictEqual(
+            {'max_count': 0, 'screen_name': 'repeating'},
+            manager.tasks[2].kwargs
+        )
         self.assertFalse(manager.tasks[2].done)

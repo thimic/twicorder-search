@@ -7,9 +7,10 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Optional, Set
+from typing import Optional, Set, Tuple
 
 from twicorder import NoTasksException
+from twicorder.appdata import AppData
 from twicorder.constants import TW_TIME_FORMAT
 from twicorder.queries import BaseQuery
 from twicorder.tasks.task import Task
@@ -30,13 +31,15 @@ class UserTimelineTaskGenerator(BaseTaskGenerator):
 
     name = 'user_timeline'
 
-    def __init__(self, name_pattern: str, delimiter: str = '\n',
-                 lookup_method: str = 'id', max_requests: Optional[int] = None,
+    def __init__(self, app_data: AppData, name_pattern: str,
+                 delimiter: str = '\n', lookup_method: str = 'id',
+                 max_requests: Optional[int] = None,
                  max_age: Optional[int] = None):
         """
         Entry point for UserTimelineTaskGenerator.
 
         Args:
+            app_data: AppData object for persistent storage between sessions
             name_pattern: Glob name pattern
             delimiter: User ID/name delimiter. Defaults to new line.
             lookup_method: "id" if looking up user ids or "username" if looking
@@ -47,7 +50,7 @@ class UserTimelineTaskGenerator(BaseTaskGenerator):
                      considered done
 
         """
-        super().__init__()
+        super().__init__(app_data=app_data)
 
         if max_requests and max_age:
             raise ValueError(
@@ -108,7 +111,7 @@ class UserTimelineTaskGenerator(BaseTaskGenerator):
         """
         return query.iterations >= max_requests
 
-    def fetch(self):
+    async def fetch(self):
         """
         Method to generate tasks. Should populate UserLookupTaskGenerator._tasks.
         """
@@ -117,21 +120,27 @@ class UserTimelineTaskGenerator(BaseTaskGenerator):
         for filepath in Path('/').glob(self._name_pattern.lstrip('/')):
             users.update(filepath.read_text().splitlines())
 
-        if self._lookup_method == self.LookupMethod.Id:
-            sorted_users = sorted(users, key=lambda x: int(x))
-        else:
-            sorted_users = sorted(users)
-
-        if not sorted_users:
+        if not users:
             msg = (
                 f'Found no files containing usernames or IDs for name pattern '
                 f'{self._name_pattern!r}.'
             )
             raise NoTasksException(msg)
 
+        # Remove already crawled users
+        existing: Tuple[Tuple[str, int]] = await self._app_data.get_taskgen_ids(self.name)
+        existing_users = {e[0] for e in existing}
+        users = users.difference(existing_users)
+
+        if self._lookup_method == self.LookupMethod.Id:
+            sorted_users = sorted(users, key=lambda x: int(x))
+        else:
+            sorted_users = sorted(users)
+
         for user in sorted_users:
             kwargs = dict(
                 name='user_timeline',
+                taskgen=self.name,
                 frequency=10000,
                 iterations=1,
                 output=f'user_timelines/{user}',

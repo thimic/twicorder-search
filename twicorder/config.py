@@ -77,6 +77,8 @@ class _Config:
         """
         generators = []
         for generator, kwarg_str in task_gen:
+            if not kwarg_str:
+                continue
             kwargs = {}
             for kwarg in kwarg_str.split(','):
                 key, value = kwarg.split('=')

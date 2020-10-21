@@ -4,6 +4,7 @@
 from abc import ABC, abstractmethod
 from typing import List
 
+from twicorder.appdata import AppData
 from twicorder.tasks.task import Task
 
 
@@ -14,10 +15,11 @@ class BaseTaskGenerator(ABC):
 
     name = NotImplemented
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, app_data: AppData, *args, **kwargs):
         """
         Entry point for BaseTaskGenerator.
         """
+        self._app_data = app_data
         self._tasks = []
 
     @property
@@ -34,7 +36,7 @@ class BaseTaskGenerator(ABC):
         self._tasks = []
 
     @abstractmethod
-    def fetch(self):
+    async def fetch(self):
         """
         Method to generate tasks. Should populate BaseTaskGenerator._tasks.
         """

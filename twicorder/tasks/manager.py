@@ -5,27 +5,38 @@ from __future__ import annotations
 
 from typing import List, Tuple
 
+from twicorder.appdata import AppData
 from twicorder.tasks.generators import load_generators
 from twicorder.tasks.task import Task
 
 
 class TaskManager:
 
-    def __init__(self, generators: List[Tuple[str, dict]]):
+    def __init__(self, app_data: AppData, generators: List[Tuple[str, dict]]):
         """
         Reading tasks from yaml file and parsing to a dictionary.
 
         Args:
+            app_data: AppData object for persistent storage between sessions
             generators: Generator names and kwargs
 
         """
-        all_generators = load_generators()
-
+        self._app_data = app_data
+        self._generators = generators
         self._tasks: List[Task] = []
 
-        for generator_name, kwargs in generators:
-            task_generator = all_generators[generator_name](**kwargs)
-            task_generator.fetch()
+    async def load(self):
+        """
+        Asynchronously load tasks from all task generators.
+        """
+        all_generators = load_generators()
+
+        for generator_name, kwargs in self._generators:
+            task_generator = all_generators[generator_name](
+                app_data=self._app_data,
+                **kwargs
+            )
+            await task_generator.fetch()
             self._tasks += task_generator.tasks
 
     @property
@@ -39,16 +50,3 @@ class TaskManager:
         """
         self._tasks = [t for t in self._tasks if not t.done]
         return self._tasks
-
-
-if __name__ == '__main__':
-    generators = [
-        ('user_id', {'name_pattern': '/Users/thimic/Desktop/follower_ids/*.txt'})
-    ]
-    manager = TaskManager(generators)
-    print(len(manager.tasks))
-    from pprint import pprint
-    pprint(manager.tasks[0]._kwargs)
-    pprint(len(manager.tasks[0]._kwargs['user_id'].split(',')))
-    pprint(len(manager.tasks[-1]._kwargs['user_id'].split(',')))
-

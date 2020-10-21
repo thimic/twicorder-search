@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from __future__ import annotations
+
 import urllib
 
 import httpx
+
+from datetime import datetime
+from typing import Callable, Optional
 
 from twicorder.appdata import AppData
 from twicorder.constants import RequestMethod
@@ -33,9 +38,11 @@ class UserLookupQuery(ProductionRequestQuery):
     endpoint = '/users/lookup'
     result_type = ProductionRequestQuery.ResultType.UserList
 
-    def __init__(self, app_data: AppData, output: str = None,
-                 max_count: int = 0, **kwargs):
-        super().__init__(app_data, output, max_count, **kwargs)
+    def __init__(self, app_data: AppData, taskgen: str, output: str = None,
+                 max_count: int = 0,
+                 stop_func: Optional[Callable[[UserLookupQuery], bool]] = None,
+                 **kwargs):
+        super().__init__(app_data, taskgen, output, max_count, stop_func, **kwargs)
         self._kwargs['tweet_mode'] = 'extended'
         self._kwargs['include_entities'] = 'true'
         self._kwargs.update(kwargs)
@@ -65,6 +72,16 @@ class UserLookupQuery(ProductionRequestQuery):
         await self.bake_ids()
         self.log(f'Cached {self.type.name} IDs to disk!')
 
+        task_ids: Optional[str] = self.kwargs.get(
+            'user_id',
+            self.kwargs.get('screen_name')
+        )
+        if not task_ids:
+            return
+        now = int(datetime.utcnow().timestamp())
+        taskgen_ids = [(i, now) for i in task_ids.split(',')]
+        await self.app_data.add_taskgen_ids(self.taskgen, taskgen_ids)
+
 
 class UserLookupPostQuery(UserLookupQuery):
 
@@ -78,9 +95,11 @@ class UserLookupV2PostQuery(UserLookupQuery):
     endpoint = '/users'
     _base_url = 'https://api.twitter.com/2'
 
-    def __init__(self, app_data: AppData, output: str = None,
-                 max_count: int = 0, **kwargs):
-        super().__init__(app_data, output, max_count, **kwargs)
+    def __init__(self, app_data: AppData, taskgen: str, output: str = None,
+                 max_count: int = 0,
+                 stop_func: Optional[Callable[[UserLookupV2PostQuery], bool]] = None,
+                 **kwargs):
+        super().__init__(app_data, taskgen, output, max_count, stop_func, **kwargs)
         self._kwargs['expansions'] = 'author_id'
         self._kwargs['user.fields'] = 'created_at,description,public_metrics'
         self._kwargs.update(kwargs)

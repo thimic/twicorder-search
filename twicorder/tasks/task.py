@@ -14,8 +14,10 @@ class Task:
 
     stop_func: Optional[Callable[[BaseQuery], bool]] = None
 
-    def __init__(self, name, frequency=15, iterations=0, output=None, **kwargs):
+    def __init__(self, name: str, taskgen: str, frequency: int = 15,
+                 iterations: int = 0, output: Optional[str] = None, **kwargs):
         self._name = name
+        self._taskgen = taskgen
         self._frequency = frequency
         self._iterations = iterations
         self._remaining = iterations
@@ -32,6 +34,7 @@ class Task:
         string = (
             f'Task('
             f'name={self.name!r}, '
+            f'taskgen={self.taskgen!r}, '
             f'frequency={self.frequency}, '
             f'iterations={self.iterations}, '
             f'output={self.output!r}, '
@@ -50,6 +53,17 @@ class Task:
 
         """
         return self._name
+
+    @property
+    def taskgen(self) -> str:
+        """
+        Name of the generator that created the task.
+
+        Returns:
+            Task generator name
+
+        """
+        return self._taskgen
 
     @property
     def frequency(self) -> int:
