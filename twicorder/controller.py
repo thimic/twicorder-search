@@ -161,5 +161,5 @@ class Twicorder:
             query (BaseQuery): Query object
 
         """
-        await query.save()
+        await query.async_save()
 

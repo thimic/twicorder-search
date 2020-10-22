@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import httpx
 import json
@@ -11,6 +12,7 @@ import traceback
 import yaml
 
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 
 from twicorder.appdata import AppData
@@ -35,6 +37,8 @@ class BaseQuery:
     _results_path = None
     _next_cursor_path = None
     _type = ResultType.Generic
+
+    _executor = ThreadPoolExecutor(2)
 
     class ResultType(Enum):
         """
@@ -405,7 +409,7 @@ class BaseQuery:
         log_data += '\n' + '=' * 80
         return log_data
 
-    async def save(self):
+    def save(self):
         """
         Save the results of the query to disk.
         """
@@ -421,6 +425,13 @@ class BaseQuery:
         results_str = '\n'.join(json.dumps(r) for r in self._results)
         write(f'{results_str}\n', file_path)
         self.log(f'Wrote {len(list(self.results))} results to "{file_path}"')
+
+    async def async_save(self):
+        """
+        Save asynchronously.
+        """
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(self._executor, self.save)
 
     async def bake_ids(self):
         """

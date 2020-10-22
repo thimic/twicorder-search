@@ -6,4 +6,3 @@ asyncclick~=7.0.9
 asyncio~=3.4.3
 click~=7.1.2
 httpx~=0.13.3
-uvloop~=0.14.0
