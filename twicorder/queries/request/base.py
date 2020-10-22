@@ -11,6 +11,7 @@ from datetime import datetime
 from http import HTTPStatus
 from typing import Callable, Optional, Set
 
+from twicorder import ForbiddenException, UnauthorisedException
 from twicorder.appdata import AppData
 from twicorder.aio_auth import AsyncAuthHandler
 from twicorder.constants import (
@@ -184,9 +185,12 @@ class BaseRequestQuery(BaseQuery):
                     remaining=0,
                     reset=datetime.now().timestamp() + 60
                 )
-            elif response.status_code in (HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN):
+            elif response.status_code == HTTPStatus.UNAUTHORIZED:
                 msg = '<{r.status_code}> {r.reason_phrase}: {r.text}'.format(r=response)
-                raise RuntimeError(msg)
+                raise UnauthorisedException(msg)
+            elif response.status_code == HTTPStatus.FORBIDDEN:
+                msg = '<{r.status_code}> {r.reason_phrase}: {r.text}'.format(r=response)
+                raise ForbiddenException(msg)
             else:
                 self.log(
                     '<{r.status_code}> {r.reason_phrase}: {r.text}'

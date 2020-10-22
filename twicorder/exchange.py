@@ -4,8 +4,9 @@
 from asyncio import create_task, gather, sleep, Queue, Task
 from typing import Callable, Dict, Optional
 
-from twicorder.queries import BaseQuery
+from twicorder import ForbiddenException, UnauthorisedException
 from twicorder.logger import TwiLogger
+from twicorder.queries import BaseQuery
 
 logger = TwiLogger()
 
@@ -47,8 +48,18 @@ async def worker(name: str, queue: Queue, on_result: Optional[Callable] = None):
         while not query.done:
             try:
                 await query.start()
+            except UnauthorisedException as error:
+                try_count += 1
+                if try_count <= 3:
+                    await sleep(1)
+                    continue
+                else:
+                    logger.warning(error)
+                    break
+            except ForbiddenException as error:
+                logger.error(error)
+                break
             except Exception:
-                logger.exception(f'Query {query!r} failed:\n')
                 # If the query failed, try 5 more times with increasing wait
                 # times before giving up.
                 try_count += 1
@@ -56,6 +67,7 @@ async def worker(name: str, queue: Queue, on_result: Optional[Callable] = None):
                     await sleep(2 ^ try_count)
                     continue
                 else:
+                    logger.exception(f'Query {query!r} failed:\n')
                     break
             if on_result:
                 await on_result(query)

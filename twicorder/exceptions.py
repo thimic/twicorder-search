@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from http import HTTPStatus
+
 
 class TwicorderException(BaseException):
     pass
@@ -51,3 +53,13 @@ class NoCredentialsException(TwicorderException):
                 'README.md for details.'
             )]
         super().__init__(*args, **kwargs)
+
+
+class UnauthorisedException(TwicorderException):
+
+    code = HTTPStatus.UNAUTHORIZED
+
+
+class ForbiddenException(TwicorderException):
+
+    code = HTTPStatus.FORBIDDEN

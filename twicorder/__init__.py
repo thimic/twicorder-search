@@ -2,9 +2,11 @@
 # -*- coding: utf-8 -*-
 
 from twicorder.exceptions import (
+    ForbiddenException,
     NoCredentialsException,
     NoTasksException,
-    TwicorderException
+    TwicorderException,
+    UnauthorisedException,
 )
 
 
