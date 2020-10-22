@@ -8,12 +8,11 @@ import copy
 import httpx
 import json
 import os
-import traceback
 import yaml
 
 from datetime import datetime, timedelta
-from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
+from functools import partial
 
 from twicorder.appdata import AppData
 from twicorder.config import Config
@@ -21,9 +20,13 @@ from twicorder.constants import (
     DEFAULT_OUTPUT_EXTENSION,
     ResultType,
 )
-from twicorder.utils import write, timestamp_to_datetime
+from twicorder.utils import write
 
 from typing import Any, Optional, Iterable, Callable
+
+
+from twicorder.logger import TwiLogger
+logger = TwiLogger()
 
 
 class BaseQuery:
@@ -37,8 +40,6 @@ class BaseQuery:
     _results_path = None
     _next_cursor_path = None
     _type = ResultType.Generic
-
-    _executor = ThreadPoolExecutor(2)
 
     class ResultType(Enum):
         """
@@ -409,12 +410,13 @@ class BaseQuery:
         log_data += '\n' + '=' * 80
         return log_data
 
-    def save(self):
+    async def save(self):
         """
         Save the results of the query to disk.
         """
         if not self._results or not self._output:
             return
+        loop = asyncio.get_event_loop()
         out_dir = os.path.join(Config.out_dir,  self._output or self.uid)
         extension = Config.out_extension or DEFAULT_OUTPUT_EXTENSION
         marker = self._results[0]
@@ -423,15 +425,11 @@ class BaseQuery:
         filename = f'{stamp:%Y-%m-%d_%H-%M-%S}_{uid}{extension}'
         file_path = os.path.join(out_dir, filename)
         results_str = '\n'.join(json.dumps(r) for r in self._results)
-        write(f'{results_str}\n', file_path)
+        await loop.run_in_executor(
+            None,
+            partial(write, f'{results_str}\n', file_path)
+        )
         self.log(f'Wrote {len(list(self.results))} results to "{file_path}"')
-
-    async def async_save(self):
-        """
-        Save asynchronously.
-        """
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(self._executor, self.save)
 
     async def bake_ids(self):
         """

@@ -7,7 +7,6 @@ import os
 import yaml
 
 from asyncio import get_event_loop
-from concurrent.futures import ThreadPoolExecutor
 
 from twicorder import NoTasksException
 from twicorder.constants import (
@@ -26,8 +25,6 @@ class ConfigTaskGenerator(BaseTaskGenerator):
     """
 
     name = 'config'
-
-    _executor = ThreadPoolExecutor(1)
 
     def sync_fetch(self):
         """
@@ -59,4 +56,4 @@ class ConfigTaskGenerator(BaseTaskGenerator):
         Method to generate tasks. Should populate BaseTaskGenerator._tasks.
         """
         loop = get_event_loop()
-        await loop.run_in_executor(self._executor, self.sync_fetch)
+        await loop.run_in_executor(None, self.sync_fetch)
