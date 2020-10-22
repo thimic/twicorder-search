@@ -23,7 +23,8 @@ class _Config:
                  access_token: str, access_secret: str, project_dir: str,
                  out_dir: str, out_extension: str, task_file: str,
                  full_user_mentions: bool, user_lookup_interval: int,
-                 appdata_timeout: float, task_gen: List[Tuple[str, str]]):
+                 appdata_token: str, appdata_timeout: float,
+                 task_gen: List[Tuple[str, str]]):
         """
         Gets config attributes from command line arguments or environment
         variables.
@@ -42,6 +43,7 @@ class _Config:
             out_extension (str): File extension for recorded tweets, i.e. '.zip'
             task_file (str): Path to YAML file containing tasks to execute
             full_user_mentions (bool): For mentions, look up full user data
+            appdata_token (str): Name to use for storing application data
             user_lookup_interval (int): Minutes between lookups of the same user
             appdata_timeout (float): Seconds to timeout for internal data store
             task_gen (List[Tuple[str, str]]): Task generators with keyword args
@@ -53,6 +55,7 @@ class _Config:
         self._access_secret = access_secret
 
         self._project_dir = project_dir or DEFAULT_PROJECT_DIR
+        self._appdata_token = appdata_token or APP_DATA_TOKEN
         self._out_dir = out_dir or os.path.join(self._project_dir, 'output')
         self._out_extension = out_extension or DEFAULT_OUTPUT_EXTENSION
         self._task_file = task_file or os.path.join(self._project_dir, 'tasks.yaml')
@@ -171,6 +174,13 @@ class _Config:
         return self._task_gen
 
     @property
+    def appdata_token(self) -> str:
+        """
+        Name to use for storing application data.
+        """
+        return self._appdata_token
+
+    @property
     def appdata_dir(self) -> str:
         """
         Directory for storing internal data.
@@ -182,7 +192,7 @@ class _Config:
         """
         SQLite file for storing internal data.
         """
-        return os.path.join(self.appdata_dir, f'{APP_DATA_TOKEN}.sql')
+        return os.path.join(self.appdata_dir, f'{self.appdata_token}.sql')
 
     @property
     def log_dir(self) -> str:
@@ -196,15 +206,16 @@ class _Config:
         """
         Log file.
         """
-        return os.path.join(self.log_dir, f'{APP_DATA_TOKEN}.log')
+        return os.path.join(self.log_dir, f'{self.appdata_token}.log')
 
 
 def load(consumer_key=None, consumer_secret=None, access_token=None,
          access_secret=None, project_dir=None, out_dir=None, out_extension=None,
          task_file=None, full_user_mentions=False,
+         appdata_token: str = APP_DATA_TOKEN,
          user_lookup_interval=DEFAULT_EXPAND_USERS_INTERVAL,
          appdata_timeout=DEFAULT_APP_DATA_CONNECTION_TIMEOUT,
-         task_gen: Optional[List[Tuple[str, str]]]=None):
+         task_gen: Optional[List[Tuple[str, str]]] = None):
     """
     Function to populate config and assign it to twicorder.config.Config.
 
@@ -218,6 +229,7 @@ def load(consumer_key=None, consumer_secret=None, access_token=None,
         out_extension (str): File extension for recorded tweets, i.e. '.zip'
         task_file (str): Path to YAML file containing tasks to execute
         full_user_mentions (bool): For mentions, look up full user data
+        appdata_token (str): Name to use for storing application data
         user_lookup_interval (int): Minutes between lookups of the same user
         appdata_timeout (float): Seconds to timeout for internal data store
         task_gen (List[Tuple[str, str]]): Task generators with keyword args
@@ -234,6 +246,7 @@ def load(consumer_key=None, consumer_secret=None, access_token=None,
         out_dir=out_dir,
         task_file=task_file,
         full_user_mentions=full_user_mentions,
+        appdata_token=appdata_token,
         user_lookup_interval=user_lookup_interval,
         appdata_timeout=appdata_timeout,
         task_gen=task_gen or [('config', '')]
