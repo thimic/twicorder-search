@@ -53,7 +53,8 @@ class TweetRequestQuery(ProductionRequestQuery):
 
         """
         await super().finalise(response)
-        await self.bake_ids()
+        if Config.remove_duplicates:
+            await self.bake_ids()
         self.log(f'Cached {self.type.name} IDs to disk!')
 
         # Cache last tweet ID found to disk if the query, including all pages

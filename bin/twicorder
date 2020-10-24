@@ -96,12 +96,23 @@ def utils(ctx: click.Context, clear_cache: bool, purge_logs: bool):
         '"user_id name_pattern=/tmp/**/*_ids.txt,delimiter=,"'
     )
 )
+@click.option(
+    '--remove-duplicates',
+    is_flag=True,
+    default=True,
+    show_default=True,
+    help=(
+        'Ensures duplicated tweets/users are not recorded. Saves space, but '
+        'can slow down the crawler.'
+    )
+)
 @click.pass_context
 async def run(ctx: click.Context, consumer_key: str, consumer_secret: str,
               access_token: str, access_secret: str, out_dir: str,
               out_extension: str, task_file: str, full_user_mentions: bool,
               appdata_token: str, user_lookup_interval: int,
-              appdata_timeout: float, task_gen: List[Tuple[str, str]]):
+              appdata_timeout: float, task_gen: List[Tuple[str, str]],
+              remove_duplicates: bool):
     """
     Start crawler
     """
@@ -122,7 +133,8 @@ async def run(ctx: click.Context, consumer_key: str, consumer_secret: str,
         appdata_token=appdata_token,
         user_lookup_interval=user_lookup_interval,
         appdata_timeout=appdata_timeout,
-        task_gen=task_gen
+        task_gen=task_gen,
+        remove_duplicates=remove_duplicates,
     )
     from twicorder.config import Config
     from twicorder.logger import TwiLogger

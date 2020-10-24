@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Callable, Optional
 
 from twicorder.appdata import AppData
+from twicorder.config import Config
 from twicorder.constants import RequestMethod
 from twicorder.queries import ProductionRequestQuery
 
@@ -69,7 +70,8 @@ class UserLookupQuery(ProductionRequestQuery):
 
         """
         await super().finalise(response)
-        await self.bake_ids()
+        if Config.remove_duplicates:
+            await self.bake_ids()
         self.log(f'Cached {self.type.name} IDs to disk!')
 
         task_ids: Optional[str] = self.kwargs.get(

@@ -24,7 +24,7 @@ class _Config:
                  out_dir: str, out_extension: str, task_file: str,
                  full_user_mentions: bool, user_lookup_interval: int,
                  appdata_token: str, appdata_timeout: float,
-                 task_gen: List[Tuple[str, str]]):
+                 task_gen: List[Tuple[str, str]], remove_duplicates: bool):
         """
         Gets config attributes from command line arguments or environment
         variables.
@@ -47,6 +47,9 @@ class _Config:
             user_lookup_interval (int): Minutes between lookups of the same user
             appdata_timeout (float): Seconds to timeout for internal data store
             task_gen (List[Tuple[str, str]]): Task generators with keyword args
+            remove_duplicates (bool): Ensures duplicated tweets/users are not
+                                      recorded. Saves space, but can slow down
+                                      the crawler.
 
         """
         self._consumer_key = consumer_key
@@ -65,6 +68,7 @@ class _Config:
         self._appdata_timeout = appdata_timeout
 
         self._task_gen = self.parse_task_generators(task_gen)
+        self._remove_duplicates = remove_duplicates
 
     @staticmethod
     def parse_task_generators(task_gen: List[Tuple[str, str]]) -> List[Tuple[str, dict]]:
@@ -174,6 +178,18 @@ class _Config:
         return self._task_gen
 
     @property
+    def remove_duplicates(self) -> bool:
+        """
+        Ensures duplicated tweets/users are not recorded. Saves space, but can
+        slow down the crawler.
+
+        Returns:
+            True if duplicates should be removed, else False
+
+        """
+        return self._remove_duplicates
+
+    @property
     def appdata_token(self) -> str:
         """
         Name to use for storing application data.
@@ -215,7 +231,8 @@ def load(consumer_key=None, consumer_secret=None, access_token=None,
          appdata_token: str = APP_DATA_TOKEN,
          user_lookup_interval=DEFAULT_EXPAND_USERS_INTERVAL,
          appdata_timeout=DEFAULT_APP_DATA_CONNECTION_TIMEOUT,
-         task_gen: Optional[List[Tuple[str, str]]] = None):
+         task_gen: Optional[List[Tuple[str, str]]] = None,
+         remove_duplicates: bool = True):
     """
     Function to populate config and assign it to twicorder.config.Config.
 
@@ -233,7 +250,9 @@ def load(consumer_key=None, consumer_secret=None, access_token=None,
         user_lookup_interval (int): Minutes between lookups of the same user
         appdata_timeout (float): Seconds to timeout for internal data store
         task_gen (List[Tuple[str, str]]): Task generators with keyword args
-
+        remove_duplicates (bool): Ensures duplicated tweets/users are not
+                                  recorded. Saves space, but can slow down the
+                                  crawler.
     """
     global Config
     Config = _Config(
@@ -249,5 +268,6 @@ def load(consumer_key=None, consumer_secret=None, access_token=None,
         appdata_token=appdata_token,
         user_lookup_interval=user_lookup_interval,
         appdata_timeout=appdata_timeout,
-        task_gen=task_gen or [('config', '')]
+        task_gen=task_gen or [('config', '')],
+        remove_duplicates=remove_duplicates,
     )
