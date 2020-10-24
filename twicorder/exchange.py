@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 
 from asyncio import create_task, gather, sleep, Queue, Task
-from typing import Callable, Dict, Optional
+from collections import defaultdict
+from typing import Callable, Dict, Optional, Set
 
 from twicorder import ForbiddenException, UnauthorisedException
 from twicorder.logger import TwiLogger
@@ -32,7 +33,7 @@ class QueryQueue(Queue):
         return item
 
 
-async def worker(name: str, queue: Queue, on_result: Optional[Callable] = None):
+async def query_worker(name: str, queue: Queue, on_result: Optional[Callable] = None):
     """
     Fetches query from queue and executes it.
     """
@@ -85,7 +86,7 @@ class QueryExchange:
     """
 
     queues: Dict[str, QueryQueue] = {}
-    tasks: Dict[str, Task] = {}
+    workers: Dict[str, Set[Task]] = defaultdict(set)
     failure: bool = False
 
     @classmethod
@@ -107,29 +108,33 @@ class QueryExchange:
         return cls.queues[endpoint]
 
     @classmethod
-    def start_worker(cls, endpoint: str, queue: Queue, callback=None) -> Task:
+    def start_workers(cls, endpoint: str, queue: Queue,
+                      callback: Optional[Callable] = None,
+                      worker_count: int = 4) -> Set[Task]:
         """
-        Retrieves the thread for the given endpoint if it exists. If a thread
-        exists and is alive, return it. Otherwise create a new thread and start
-        it.
+        Retrieves the workers for the given endpoint if they exist. If one or
+        more worker exists and is alive, return workers. Otherwise create new
+        workers and start them.
 
         Args:
-            endpoint (str): API endpoint
-            queue (Queue): Work queue for thread
-            callback (func): Callback function that handles query results
+            endpoint: API endpoint
+            queue: Work queue for thread
+            callback: Callback function that handles query results
+            worker_count: Number of workers to create for the given endpoint
 
         Returns:
-            QueryWorker: Worker thread
+            Query workers
 
         """
-        task = cls.tasks.get(endpoint)
-        if task and not task.done():
-            return task
-        task = create_task(
-            worker(name=endpoint, queue=queue, on_result=callback)
-        )
-        cls.tasks[endpoint] = task
-        return task
+        workers = cls.workers.get(endpoint)
+        if workers and not all([w.done() for w in workers]):
+            return workers
+        for i in range(worker_count):
+            worker = create_task(
+                query_worker(name=endpoint, queue=queue, on_result=callback)
+            )
+            cls.workers[endpoint].add(worker)
+        return workers
 
     @classmethod
     async def add(cls, query, callback=None):
@@ -143,18 +148,22 @@ class QueryExchange:
         """
         queue = cls.get_queue(query.endpoint)
         await queue.put(query)
-        cls.start_worker(query.endpoint, queue, callback)
+        cls.start_workers(query.endpoint, queue, callback)
 
     @classmethod
     def active(cls) -> bool:
         """
-        Whether any threads in the QueryExchange are active.
+        Whether any workers in the QueryExchange are active.
 
         Returns:
-            bool: True if any threads are active, else False
+            bool: True if any workers are active, else False
 
         """
-        return any(not t.done() for t in cls.tasks.values())
+        for endpoint_workers in cls.workers.values():
+            for worker in endpoint_workers:
+                if not worker.done():
+                    return True
+        return False
 
     @classmethod
     def clear(cls):
@@ -162,7 +171,7 @@ class QueryExchange:
         Prepares QueryExchange for a new run.
         """
         cls.queues = {}
-        cls.tasks = {}
+        cls.workers = {}
         cls.failure = False
 
     @classmethod
@@ -175,8 +184,11 @@ class QueryExchange:
         for queue in cls.queues.values():
             await queue.put(None)
 
-        # Cancel our worker tasks.
-        for task in cls.tasks.values():
-            task.cancel()
-        # Wait until all worker tasks are cancelled.
-        await gather(*cls.tasks.values(), return_exceptions=True)
+        # Cancel our workers.
+        all_workers = set()
+        for endpoint_workers in cls.workers.values():
+            for worker in endpoint_workers:
+                worker.cancel()
+                all_workers.add(worker)
+        # Wait until all workers are cancelled.
+        await gather(*all_workers, return_exceptions=True)
