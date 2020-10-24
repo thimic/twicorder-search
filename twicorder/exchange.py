@@ -102,7 +102,7 @@ class QueryExchange:
 
         """
         if not cls.queues.get(endpoint):
-            queue = QueryQueue()
+            queue = QueryQueue(maxsize=100)
             cls.queues[endpoint] = queue
         return cls.queues[endpoint]
 
@@ -132,7 +132,7 @@ class QueryExchange:
         return task
 
     @classmethod
-    def add(cls, query, callback=None):
+    async def add(cls, query, callback=None):
         """
         Finds appropriate queue for given end point and adds it.
 
@@ -142,7 +142,7 @@ class QueryExchange:
 
         """
         queue = cls.get_queue(query.endpoint)
-        queue.put_nowait(query)
+        await queue.put(query)
         cls.start_worker(query.endpoint, queue, callback)
 
     @classmethod

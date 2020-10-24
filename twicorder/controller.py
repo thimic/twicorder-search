@@ -110,7 +110,7 @@ class Twicorder:
                         update = True
                         query = self.cast_query(app_data, task)
                         # Todo: Finish callback logic!
-                        QueryExchange.add(query, self.on_query_result)
+                        await QueryExchange.add(query, self.on_query_result)
                         task_count += 1
                     if update:
                         logger.info('Added %s tasks', task_count)
