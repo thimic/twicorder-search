@@ -28,7 +28,7 @@ class UserQuery(ProductionRequestQuery):
         self._kwargs['include_entities'] = 'true'
         self._kwargs.update(kwargs)
 
-    def save(self):
+    async def save(self):
         for user in self.results:
             CachedUserCentral.add(user)
 

@@ -6,6 +6,7 @@ from __future__ import annotations
 import time
 
 from typing import Callable, Optional
+from weakref import WeakValueDictionary
 
 from twicorder.queries import BaseQuery
 
@@ -23,7 +24,7 @@ class Task:
         self._remaining = iterations
         self._output = output
         self._kwargs = kwargs
-        self._queries = []
+        self._queries: WeakValueDictionary[str, BaseQuery] = WeakValueDictionary()
 
         self._last_run = None
 
@@ -144,18 +145,18 @@ class Task:
             bool: True if all task iterations are done, else False
 
         """
-        alive_queries = []
-        for query in self._queries:
+        alive_queries: WeakValueDictionary[str: BaseQuery] = WeakValueDictionary()
+        for uid, query in self._queries.items():
             if query.done:
                 self._remaining -= 1
                 self._remaining = max(self._remaining, 0)
             else:
-                alive_queries.append(query)
+                alive_queries[uid] = query
         self._queries = alive_queries
 
         return self._iterations != 0 and self._remaining == 0
 
-    def add_query(self, query: 'BaseQuery'):
+    def add_query(self, query: BaseQuery):
         """
         Add a query to the list of task queries.
 
@@ -164,4 +165,4 @@ class Task:
 
         """
         self._last_run = time.time()
-        self._queries.append(query)
+        self._queries[id(query)] = query
