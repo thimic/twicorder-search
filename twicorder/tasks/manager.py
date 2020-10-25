@@ -22,7 +22,7 @@ class TaskManager:
 
         """
         self._app_data = app_data
-        self._generators = generators
+        self._generators = generators or [('config', {})]
         self._tasks: List[Task] = []
 
     async def load(self):
