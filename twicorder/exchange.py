@@ -134,7 +134,7 @@ class QueryExchange:
                 query_worker(name=endpoint, queue=queue, on_result=callback)
             )
             cls.workers[endpoint].add(worker)
-        return workers
+        return cls.workers.get(endpoint)
 
     @classmethod
     async def add(cls, query, callback=None):

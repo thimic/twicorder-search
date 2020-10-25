@@ -174,7 +174,12 @@ class CachedUserCentral:
             missing_users[i:i + n] for i in range(0, len(missing_users), n)
         ]
         for chunk in chunks:
-            await UserQuery(app_data, user_id=','.join([str(u) for u in chunk])).start()
+            await UserQuery(
+                app_data,
+                'twicorder',
+                user_id=','.join([str(u) for u in chunk])
+            ).start()
+
         for tweet in tweets:
             mention_sections = collect_key_values('user_mentions', tweet)
             for mention_section in mention_sections:
