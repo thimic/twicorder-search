@@ -63,3 +63,8 @@ class UnauthorisedException(TwicorderException):
 class ForbiddenException(TwicorderException):
 
     code = HTTPStatus.FORBIDDEN
+
+
+class RatelimitException(TwicorderException):
+
+    code = HTTPStatus.TOO_MANY_REQUESTS

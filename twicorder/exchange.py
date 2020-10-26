@@ -3,9 +3,14 @@
 
 from asyncio import create_task, gather, sleep, Queue, Task
 from collections import defaultdict
+from datetime import timedelta
 from typing import Callable, Dict, Optional, Set
 
-from twicorder import ForbiddenException, UnauthorisedException
+from twicorder import (
+    ForbiddenException,
+    RatelimitException,
+    UnauthorisedException,
+)
 from twicorder.logger import TwiLogger
 from twicorder.queries import BaseQuery
 
@@ -60,6 +65,10 @@ async def query_worker(name: str, queue: Queue, on_result: Optional[Callable] = 
             except ForbiddenException as error:
                 logger.error(error)
                 break
+            except RatelimitException as error:
+                logger.warning(error)
+                await sleep(timedelta(minutes=15).seconds)
+                continue
             except Exception:
                 # If the query failed, try 5 more times with increasing wait
                 # times before giving up.

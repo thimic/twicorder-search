@@ -5,6 +5,7 @@ from twicorder.exceptions import (
     ForbiddenException,
     NoCredentialsException,
     NoTasksException,
+    RatelimitException,
     TwicorderException,
     UnauthorisedException,
 )

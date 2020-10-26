@@ -7,11 +7,15 @@ import asyncio
 import hashlib
 import urllib
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from http import HTTPStatus
 from typing import Callable, Optional, Set
 
-from twicorder import ForbiddenException, UnauthorisedException
+from twicorder import (
+    ForbiddenException,
+    RatelimitException,
+    UnauthorisedException,
+)
 from twicorder.appdata import AppData
 from twicorder.aio_auth import AsyncAuthHandler
 from twicorder.constants import (
@@ -183,8 +187,10 @@ class BaseRequestQuery(BaseQuery):
                     endpoint=self.endpoint,
                     limit=0,
                     remaining=0,
-                    reset=datetime.now().timestamp() + 60
+                    reset=(datetime.now() + timedelta(minutes=15)).timestamp()
                 )
+                msg = '<{r.status_code}> {r.reason_phrase}: {r.text}'.format(r=response)
+                raise RatelimitException(msg)
             elif response.status_code == HTTPStatus.UNAUTHORIZED:
                 msg = '<{r.status_code}> {r.reason_phrase}: {r.text}'.format(r=response)
                 raise UnauthorisedException(msg)
