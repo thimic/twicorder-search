@@ -55,13 +55,15 @@ async def query_worker(name: str, queue: Queue, on_result: Optional[Callable] = 
             try:
                 await query.start()
             except UnauthorisedException as error:
-                try_count += 1
-                if try_count <= 3:
-                    await sleep(1)
-                    continue
-                else:
-                    logger.warning(error)
-                    break
+                logger.error(error)
+                break
+                # try_count += 1
+                # if try_count <= 3:
+                #     await sleep(1)
+                #     continue
+                # else:
+                #     logger.warning(error)
+                #     break
             except ForbiddenException as error:
                 logger.error(error)
                 break

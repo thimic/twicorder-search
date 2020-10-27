@@ -180,8 +180,6 @@ class BaseRequestQuery(BaseQuery):
         # successful 200 code.
         if response.status_code != HTTPStatus.OK:
             if response.status_code == HTTPStatus.TOO_MANY_REQUESTS:
-                self.log(f'Rate Limit in effect: {response.reason_phrase}')
-                self.log(f'Message: {response.json().get("message")}')
                 RateLimitCentral.insert(
                     auth_method=self.auth_method,
                     endpoint=self.endpoint,
