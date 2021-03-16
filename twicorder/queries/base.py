@@ -230,6 +230,21 @@ class BaseQuery:
         raise NotImplementedError
 
     @property
+    def filename(self) -> str:
+        """
+        Computed file name for saving results to disk.
+
+        Returns:
+            Result file name
+
+        """
+        extension = Config.out_extension or DEFAULT_OUTPUT_EXTENSION
+        marker = self._results[0]
+        stamp = self.result_timestamp(marker)
+        uid = self.result_id(marker)
+        return f'{stamp:%Y-%m-%d_%H-%M-%S}_{uid}{extension}'
+
+    @property
     def done(self) -> bool:
         """
         Whether the query is complete or not.
@@ -418,12 +433,7 @@ class BaseQuery:
             return
         loop = asyncio.get_event_loop()
         out_dir = os.path.join(Config.out_dir,  self._output or self.uid)
-        extension = Config.out_extension or DEFAULT_OUTPUT_EXTENSION
-        marker = self._results[0]
-        stamp = self.result_timestamp(marker)
-        uid = self.result_id(marker)
-        filename = f'{stamp:%Y-%m-%d_%H-%M-%S}_{uid}{extension}'
-        file_path = os.path.join(out_dir, filename)
+        file_path = os.path.join(out_dir, self.filename)
         results_str = '\n'.join(json.dumps(r) for r in self._results)
         await loop.run_in_executor(
             None,

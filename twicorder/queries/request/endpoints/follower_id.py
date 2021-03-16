@@ -9,7 +9,8 @@ import urllib
 from typing import Callable, Optional
 
 from twicorder.appdata import AppData
-from twicorder.constants import RequestMethod
+from twicorder.config import Config
+from twicorder.constants import DEFAULT_OUTPUT_EXTENSION, RequestMethod
 from twicorder.queries import ProductionRequestQuery
 
 
@@ -97,3 +98,17 @@ class FollowerIDQuery(ProductionRequestQuery):
         if self.done and self.last_cursor:
             self.log(f'Cached ID of last tweet returned by query to disk.')
             await self.app_data.set_last_cursor(self.uid, self.last_cursor)
+
+    @property
+    def filename(self) -> str:
+        """
+        Computed file name for saving results to disk.
+
+        Returns:
+            Result file name
+
+        """
+        extension = Config.out_extension or DEFAULT_OUTPUT_EXTENSION
+        marker = self._results[0]
+        stamp = self.result_timestamp(marker)
+        return f'{stamp:%Y-%m-%d_%H-%M-%S}_{self.iterations:04d}{extension}'
