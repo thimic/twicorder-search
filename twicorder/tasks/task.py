@@ -134,6 +134,8 @@ class Task:
         """
         if self._last_run is None:
             return True
+        if self.done or len(self._queries) > 0:
+            return False
         return time.time() - self._last_run >= self.frequency * 60
 
     @property
