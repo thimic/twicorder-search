@@ -24,7 +24,8 @@ class _Config:
                  out_dir: str, out_extension: str, task_file: str,
                  full_user_mentions: bool, user_lookup_interval: int,
                  appdata_token: str, appdata_timeout: float,
-                 task_gen: List[Tuple[str, str]], remove_duplicates: bool):
+                 task_gen: Optional[List[Tuple[str, str]]],
+                 remove_duplicates: bool):
         """
         Gets config attributes from command line arguments or environment
         variables.
@@ -71,7 +72,7 @@ class _Config:
         self._remove_duplicates = remove_duplicates
 
     @staticmethod
-    def parse_task_generators(task_gen: List[Tuple[str, str]]) -> List[Tuple[str, dict]]:
+    def parse_task_generators(task_gen: Optional[List[Tuple[str, str]]]) -> List[Tuple[str, dict]]:
         """
         Convert incoming string kwargs to dict.
 

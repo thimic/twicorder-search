@@ -55,6 +55,39 @@ $ twicorder run --task-gen user_timeline
 $ export TWICORDER_RUN_TASK_GEN="user_timeline"
 ```
 
+Full list of CLI options:
+
+```bash
+$ twicorder run --help
+Usage: twicorder run [OPTIONS]
+
+  Start crawler
+
+Options:
+  --consumer-key TEXT             Twitter consumer key  [required]
+  --consumer-secret TEXT          Twitter consumer secret  [required]
+  --access-token TEXT             Twitter access token  [required]
+  --access-secret TEXT            Twitter access secret  [required]
+  --out-dir TEXT                  Custom output dir for crawled data
+  --out-extension TEXT            File extension for crawled files (.txt or
+                                  .zip)
+  --task-file TEXT                Yaml file containing tasks to execute
+  --full-user-mentions            For mentions, look up full user data
+  --appdata-token TEXT            App data token
+  --user-lookup-interval INTEGER  Minutes between lookups of the same user
+                                  [default: 15]
+  --appdata-timeout FLOAT         Seconds to timeout for internal data store
+                                  [default: 5.0]
+  --task-gen <TEXT TEXT>...       Task generator(s) to use. Example: "user_id
+                                  name_pattern=/tmp/**/*_ids.txt,delimiter=,"
+                                  [default: config]
+  --remove-duplicates             Ensures duplicated tweets/users are not
+                                  recorded. Saves space, but can slow down the
+                                  crawler.  [default: True]
+  --help                          Show this message and exit.
+
+```
+
 ## Task generators
 
 Twicorder can be configured with one or more task generators for creating API requests. 
