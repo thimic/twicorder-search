@@ -10,73 +10,79 @@ Twicorder Search can be installed using PIP:
 pip install twicorder-search
 ```
 
-For a more comprehensive guide using a virtual environment, see [Installation using Python 3 virtual environments](../master/INSTALL.md)
+For a more comprehensive guide using a virtual environment, see 
+[Installation using Python 3 virtual environments](../main/INSTALL.md)
 
-## Running Twicorder Search
-After installing, there will be a new executable available, `twicorder`. Use this to run the application:
+## Running Twicorder
+After installing, there will be a new executable available, `twicorder`. Use this to run the 
+application:
 ```bash
-twicorder
+$ twicorder
+Usage: twicorder [OPTIONS] COMMAND [ARGS]...
+
+  Twicorder Search
+
+Options:
+  --project-dir TEXT  Root directory for project
+  --help              Show this message and exit.
+
+Commands:
+  run    Start crawler
+  utils  Utility functions
+
 ```
 
-To specify a project directory, other than the default, use the flag `--project-dir`:
+The project dir is where Twicorder stores temporary files and logs. To specify a project directory 
+other than the default, use the flag `--project-dir`.:
 
 ```bash
-twicorder --project-dir /path/to/my_project
+$ twicorder --project-dir /path/to/my_project
 ```
 
-## Config
-Twicorder Search requires two config files to be set up before it will run - `preferences.yaml` and `tasks.yaml`. Both files must be created and installed to the project directory. Correct layout of the project directory is:
+If not provided, the current working directory is used.
+
+## Configuration
+Twicorder can be configured by passing parameters in the command line interface or by setting 
+environment variables. The environment variables are laid out similar to their CLI counterparts.
+
+**Specifying a task generator with CLI**
+```bash
+$ twicorder run --task-gen user_timeline 
+```
+
+**Specifying a task generator with environment variable**
+```bash
+$ export TWICORDER_RUN_TASK_GEN="user_timeline"
+```
+
+## Task generators
+
+Twicorder can be configured with one or more task generators for creating API requests. 
+
+### Tasks file
+The tasks file is the default task generator for Twicorder and is used when no generator is 
+specified. By default Twocorder searches the project root for a file called `tasks.yaml`.
 
 ```bash
 PROJECT_ROOT
-└── config
-    ├── preferences.yaml
-    └── tasks.yaml
+ ├── appdata
+ │   └── twicorder.sql
+ ├── logs
+ │   └── twicorder.log
+ └── tasks.yaml
 ```
 
-### API credentials
-Twicorder has two ways of setting API credentials. They can either be set in the config file as seen below, or set as environment variables:
+It is however possible to specify a different file path using `--task-file`:
 
-```
-CONSUMER_KEY
-CONSUMER_SECRET
-ACCESS_TOKEN
-ACCESS_SECRET
+```bash
+$ twicorder --task-file /path/to/my_file.yaml
 ```
 
-### preferences.yaml
+#### Example tasks.yaml file
 
-```yaml
-
-# API Login credentials
-consumer_key:
-consumer_secret:
-access_token:
-access_secret:
-
-# Save location, file name and extension for collected data
-save_dir:
-save_extension: ".zip"
-
-# How often this config will be reloaded by the listener (minutes)
-config_reload_interval: 15
-
-# For every tweet with mentions, look up each mention's full user data
-full_user_mentions: True
-
-# When performing user lookups, cache the user and don't check again for this
-# interval (minutes)
-user_lookup_interval: 15
-
-# (Advanced) Number of seconds Twicorder will wait for write locks to be
-# released on its internal data store
-appdata_connection_timeout: 5.0
-
-```
-
-Use this file to configure how the application runs. Set the output directory, file format, whether to expand user data for mentions etc
-
-### tasks.yaml
+Use this file to define the queries you wish to run and where to store their output data, relative 
+to the output directory. Frequency is given in minutes and defines how often a new scan will be 
+triggered for the given query.
 
 ```yaml
 
@@ -125,4 +131,75 @@ free_search:
 
 ```
 
-Use this file to define the queries you wish to run and where to store their output data, relative to the output directory. Frequency is given in minutes and defines how often a new scan will be triggered for the given query.
+
+### Docker Compose Examples
+
+Crawl data based on entries in the [tasks file](#tasks-file).
+
+```yaml
+version: "3"
+
+services:
+  twicorder-search:
+    build: ./
+    image: twicorder-search:dev
+    restart: unless-stopped
+    container_name: twicorder-search
+    network_mode: bridge
+    environment:
+      - TWICORDER_RUN_CONSUMER_KEY=XXXXXXXXXXXXXXXXXXXXXXXXX
+      - TWICORDER_RUN_CONSUMER_SECRET=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+      - TWICORDER_RUN_ACCESS_TOKEN=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+      - TWICORDER_RUN_ACCESS_SECRET=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+      - TWICORDER_RUN_REMOVE_DUPLICATES=0
+      - TWICORDER_RUN_APPDATA_TOKEN=search
+    volumes:
+      - /home/user/project/data:/data
+      - /home/user/project/config:/config
+```
+
+Crawl tweets using the `user_timeline` task generator. The generator reads all *.txt files located 
+in `/home/user/project/taskgen` on the host system (`name_pattern=/taskgen/*.txt`) and expects to 
+find one user ID (`lookup_method=id`) per line. For each user the number of page results are limited 
+to 5 (`max_requests=5).
+
+```yaml
+version: "3"
+
+services:
+  twicorder-timeline:
+    build: ./
+    image: twicorder-timeline:dev
+    restart: on-failure
+    container_name: twicorder-timeline
+    network_mode: bridge
+    environment:
+      - TWICORDER_RUN_CONSUMER_KEY=XXXXXXXXXXXXXXXXXXXXXXXXX
+      - TWICORDER_RUN_CONSUMER_SECRET=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+      - TWICORDER_RUN_ACCESS_TOKEN=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+      - TWICORDER_RUN_ACCESS_SECRET=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+      - TWICORDER_RUN_FULL_USER_MENTIONS=0
+      - TWICORDER_RUN_REMOVE_DUPLICATES=0
+      - TWICORDER_RUN_APPDATA_TOKEN=timeline
+      - TWICORDER_RUN_TASK_GEN=user_timeline name_pattern=/taskgen/*.txt,lookup_method=id,max_requests=5
+    volumes:
+      - /home/user/project/data:/data
+      - /home/user/project/taskgen:/taskgen
+```
+
+## Clearing temporary files or logs
+
+Use the `utils` command to clean up temporary files and logs:
+
+```bash
+$ twicorder utils --help
+Usage: twicorder utils [OPTIONS]
+
+  Utility functions
+
+Options:
+  --clear-cache  Clear cache and exit
+  --purge-logs   Purge logs and exit
+  --help         Show this message and exit.
+
+```

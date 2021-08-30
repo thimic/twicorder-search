@@ -17,20 +17,21 @@ class TwiLogger:
 
     @classmethod
     def setup(cls):
-        if not os.path.exists(Config.log_dir):
-            os.makedirs(Config.log_dir)
         cls._logger = logging.getLogger('Twicorder')
-        file_handler = RotatingFileHandler(
-            Config.logs,
-            maxBytes=1024**2 * 10,
-            backupCount=5
-        )
-        formatter = logging.Formatter(
-            '%(asctime)s: [%(levelname)s] %(message)s'
-        )
-        file_handler.setFormatter(formatter)
-        file_handler.setLevel(logging.WARNING)
-        cls._logger.addHandler(file_handler)
+        if Config:
+            if not os.path.exists(Config.log_dir):
+                os.makedirs(Config.log_dir)
+            file_handler = RotatingFileHandler(
+                Config.logs,
+                maxBytes=1024**2 * 10,
+                backupCount=5
+            )
+            formatter = logging.Formatter(
+                '%(asctime)s: [%(levelname)s] %(message)s'
+            )
+            file_handler.setFormatter(formatter)
+            file_handler.setLevel(logging.WARNING)
+            cls._logger.addHandler(file_handler)
 
         stream_handler = StreamHandler(sys.stdout)
         stream_handler.setLevel(logging.INFO)
