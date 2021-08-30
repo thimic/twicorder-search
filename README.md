@@ -179,7 +179,7 @@ services:
 Crawl tweets using the `user_timeline` task generator. The generator reads all *.txt files located 
 in `/home/user/project/taskgen` on the host system (`name_pattern=/taskgen/*.txt`) and expects to 
 find one user ID (`lookup_method=id`) per line. For each user the number of page results are limited 
-to 5 (`max_requests=5).
+to 5 (`max_requests=5`).
 
 ```yaml
 version: "3"
