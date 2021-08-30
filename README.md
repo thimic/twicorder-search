@@ -131,6 +131,24 @@ free_search:
 
 ```
 
+## Clearing temporary files or logs
+
+Use the `utils` command to clean up temporary files and logs:
+
+```bash
+$ twicorder utils --help
+Usage: twicorder utils [OPTIONS]
+
+  Utility functions
+
+Options:
+  --clear-cache  Clear cache and exit
+  --purge-logs   Purge logs and exit
+  --help         Show this message and exit.
+
+```
+
+## Docker
 
 ### Docker Compose Examples
 
@@ -185,21 +203,4 @@ services:
     volumes:
       - /home/user/project/data:/data
       - /home/user/project/taskgen:/taskgen
-```
-
-## Clearing temporary files or logs
-
-Use the `utils` command to clean up temporary files and logs:
-
-```bash
-$ twicorder utils --help
-Usage: twicorder utils [OPTIONS]
-
-  Utility functions
-
-Options:
-  --clear-cache  Clear cache and exit
-  --purge-logs   Purge logs and exit
-  --help         Show this message and exit.
-
 ```
