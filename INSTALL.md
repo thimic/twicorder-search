@@ -7,7 +7,7 @@ In case there are more than one Python interpreters on the system, decide which 
 To see which Python version an executable is set to launch, run the following command for the chosen executable:
 
 ```bash
-python3 -V
+$ python3 -V
 ```
 
 This will print the Python version:
@@ -21,14 +21,14 @@ Next, decide where to create the virtual environment. Twicorder will be installe
 When ready, run the following command, using the chosen Python interpreter and install directory:
    
 ```bash
-python3 -m venv ~/twicorder_env
+$ python3 -m venv ~/twicorder_env
 ```
 
 ## 2. Activate the virtual environment
 Once the virtual environment has been set up with the chosen Python interpreter, it must be activated. In the newly created environment, there’s a script in the `bin` directory, called `activate`. Source this script:
 
 ```bash
-source ~/twicorder_env/bin/activate
+$ source ~/twicorder_env/bin/activate
 ```
 
 > **NOTE**  This must be done for every new shell instance.  
@@ -39,7 +39,7 @@ The virtual environment is now ready. In The activated environment, there is a n
 In the newly activated environment, install Twicorder Search using PIP:
 
 ```bash
-pip install twicorder-search
+$ pip install twicorder-search
 ```
 
 This installs Twicorder Search and all its dependencies to the new virtual environment. 
@@ -47,19 +47,23 @@ This installs Twicorder Search and all its dependencies to the new virtual envir
 When done, try running Twicorder Search:
 
 ```bash
-twicorder --help
+$ twicorder --help
 ```
 
 Twicorder should output its help message:
 
 ```bash
-Usage: twicorder [OPTIONS]
+Usage: twicorder [OPTIONS] COMMAND [ARGS]...
 
   Twicorder Search
 
 Options:
-  --project-dir TEXT  Path to project dir. Default is ~/Twicorder.
+  --project-dir TEXT  Root directory for project
   --help              Show this message and exit.
+
+Commands:
+  run    Start crawler
+  utils  Utility functions
 ```
 
 For more information on Python 3 virtual environments and how to install them on different platforms, see [Creation of virtual environments](https://docs.python.org/3/library/venv.html).
