@@ -32,7 +32,7 @@ For a more comprehensive guide using a virtual environment, see
 After installing, there will be a new executable available, `twicorder`. Use this to run the 
 application:
 ```bash
-$ twicorder
+twicorder
 Usage: twicorder [OPTIONS] COMMAND [ARGS]...
 
   Twicorder Search
@@ -51,7 +51,7 @@ The project dir is where Twicorder stores temporary files and logs. To specify a
 other than the default, use the flag `--project-dir`.:
 
 ```bash
-$ twicorder --project-dir /path/to/my_project
+twicorder --project-dir /path/to/my_project
 ```
 
 If not provided, the current working directory is used.
@@ -62,18 +62,18 @@ environment variables. The environment variables are laid out similar to their C
 
 **Specifying a task generator with CLI**
 ```bash
-$ twicorder run --task-gen user_timeline 
+twicorder run --task-gen user_timeline 
 ```
 
 **Specifying a task generator with environment variable**
 ```bash
-$ export TWICORDER_RUN_TASK_GEN="user_timeline"
+export TWICORDER_RUN_TASK_GEN="user_timeline"
 ```
 
 Full list of CLI options:
 
 ```bash
-$ twicorder run --help
+twicorder run --help
 Usage: twicorder run [OPTIONS]
 
   Start crawler
@@ -123,7 +123,7 @@ PROJECT_ROOT
 It is however possible to specify a different file path using `--task-file`:
 
 ```bash
-$ twicorder --task-file /path/to/my_file.yaml
+twicorder --task-file /path/to/my_file.yaml
 ```
 
 #### Example tasks.yaml file
@@ -185,7 +185,7 @@ user names as input. It then generates tasks to fetch user objects for each id
 or user name.
 
 ```bash
-$ twicorder run --task-gen user_lookups name_pattern=/taskgen/*.txt,lookup_method=username
+twicorder run --task-gen user_lookups name_pattern=/taskgen/*.txt,lookup_method=username
 ```
 
 | Keyword Argument | Type  | Description                |
@@ -201,7 +201,7 @@ user names as input. It then generates tasks to fetch tweets for each user's
 timeline.
 
 ```bash
-$ twicorder run --task-gen user_timeline name_pattern=/taskgen/*.txt,lookup_method=id,max_requests=5 
+twicorder run --task-gen user_timeline name_pattern=/taskgen/*.txt,lookup_method=id,max_requests=5 
 ```
 
 | Keyword Argument | Type  | Description                                                            |
@@ -239,7 +239,7 @@ $TWICORDER_TASKGEN_PATH
 Use the `utils` command to clean up temporary files and logs:
 
 ```bash
-$ twicorder utils --help
+twicorder utils --help
 Usage: twicorder utils [OPTIONS]
 
   Utility functions
