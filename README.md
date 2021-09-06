@@ -3,6 +3,21 @@ A Twitter crawler for Python 3 based on Twitter’s public API.
 
 [![DOI](https://zenodo.org/badge/185946239.svg)](https://zenodo.org/badge/latestdoi/185946239)
 
+## Supported end points
+Twicorder Search currently supports the following end points:
+
+* `/1.1/followers/ids`
+* `/1.1/friends/list`
+* `/1.1/search/tweets`
+* `/1.1/statuses/lookup`
+* `/1.1/statuses/user_timeline`
+* `/1.1/users/lookup`
+
+To add a new end point, fork the repository and add a new query type to 
+`src/twicorder/queries/request/endpoints`. New endpoints should inherit from 
+`BaseQuery` or one of its derivatives and must implement `name`, `endpoint` and 
+`result_type`.
+
 ## Installation
 Twicorder Search can be installed using PIP:
 
@@ -162,6 +177,62 @@ free_search:
     kwargs:
       q: "#github"
 
+```
+
+### User Lookup
+
+The User Lookup generator takes one or more files with delimited user ids or 
+user names as input. It then generates tasks to fetch user objects for each id 
+or user name.
+
+```bash
+$ twicorder run --task-gen user_lookups name_pattern=/taskgen/*.txt,lookup_method=username
+```
+
+| Keyword Argument | Type  | Description                |
+| ---------------- | ----- | -------------------------- |
+| `name_pattern`   | `str` | POSIX style search pattern |
+| `delimiter`      | `str` | Default: `"\n"`            |
+| `lookup_method`  | `str` | `"id"` or `"username"`     |
+
+### User Timeline
+
+The User Timeline generator takes one or more files with delimited user ids or 
+user names as input. It then generates tasks to fetch tweets for each user's 
+timeline.
+
+```bash
+$ twicorder run --task-gen user_timeline name_pattern=/taskgen/*.txt,lookup_method=id,max_requests=5 
+```
+
+| Keyword Argument | Type  | Description                                                            |
+| ---------------- | ----- | ---------------------------------------------------------------------- |
+| `name_pattern`   | `str` | POSIX style search pattern                                             |
+| `delimiter`      | `str` | Default: `"\n"`                                                        |
+| `lookup_method`  | `str` | `"id"` or `"username"`                                                 |
+| `max_requests`   | `int` | Max number of requests before the task is considered done              |
+| `max_age`        | `int` | Max age in days for a tweet before the query should be considered done |
+
+## Create new task generator
+
+Twicorder supports creating custom task generators. To create a generator, create a class that inherits from `BaseTaskGenerator` and 
+implement the `name` class attribute and the `fetch()` method. See 
+`twicorder/tasks/generators/user_lookup_generator.py` for an example.
+
+Place the custom task 
+generator in a suitable directory and point to said directory with the 
+environment variable `TWICORDER_TASKGEN_PATH`:
+
+```bash
+export TWICORDER_TASKGEN_PATH="/path/to/my/generator_dir"
+```
+
+The task generator file name must end in `_generator.py`:
+
+```bash
+$TWICORDER_TASKGEN_PATH
+ ├── __init__.py
+ └── custom_task_generator.py
 ```
 
 ## Clearing temporary files or logs

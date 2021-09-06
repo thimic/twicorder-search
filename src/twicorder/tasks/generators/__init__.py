@@ -25,7 +25,7 @@ def load_generators() -> Dict[str, Type[BaseTaskGenerator]]:
     paths.append(this_dir)
 
     # Third party task generators
-    plugin_dir = os.getenv('TWICORDER_TASK_PATH')
+    plugin_dir = os.getenv('TWICORDER_TASKGEN_PATH')
     if plugin_dir:
         paths.append(Path(plugin_dir))
 
