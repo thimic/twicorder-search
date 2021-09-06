@@ -1,10 +1,8 @@
-FROM python:3.9-alpine
+FROM python:3.9
 
 ENV TWICORDER_PROJECT_DIR /data
 ENV TWICORDER_RUN_TASK_FILE /config/tasks.yaml
 ENV TWICORDER_RUN_FULL_USER_MENTIONS false
-
-RUN apk update && apk add gcc libffi-dev musl-dev make libressl-dev
 
 WORKDIR /etc/twicorder
 

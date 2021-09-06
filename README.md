@@ -133,7 +133,6 @@ to the output directory. Frequency is given in minutes and defines how often a n
 triggered for the given query.
 
 ```yaml
-
 # Tasks
 #
 # Queries are added on the form listed below.
